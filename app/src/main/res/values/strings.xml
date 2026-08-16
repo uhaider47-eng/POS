@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Grocery POS</string>
+    <string name="tagline_v1">Offline-First Local POS</string>
+
+    <!-- Navigation -->
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_products">Products</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Grocery POS</string>
+    <string name="shop_label">Shop</string>
+    <string name="device_label">Device</string>
+    <string name="role_label">Role</string>
+    <string name="primary_device_badge">Primary Sync Hub</string>
+    <string name="secondary_device_badge">Secondary Terminal</string>
+    <string name="primary_device_desc">This tablet acts as the authoritative local sync hub for your store network.</string>
+    <string name="quick_metrics_title">Store Status</string>
+    <string name="total_products">Registered Products</string>
+    <string name="active_products">Active in Catalog</string>
+    <string name="categories_count">Categories</string>
+    <string name="units_count">Units</string>
+
+    <!-- Shop Setup -->
+    <string name="setup_title">Set Up Your Shop</string>
+    <string name="setup_subtitle">Configure your grocery store details. This device will automatically become the Primary Sync Hub.</string>
+    <string name="shop_name_label">Shop Name</string>
+    <string name="shop_name_hint">e.g. Al-Madina Super Store</string>
+    <string name="owner_name_label">Owner Name</string>
+    <string name="owner_name_hint">e.g. Muhammad Aslam</string>
+    <string name="phone_label">Phone Number</string>
+    <string name="phone_hint">e.g. 0300-1234567</string>
+    <string name="address_label">Store Address</string>
+    <string name="address_hint">e.g. Shop #4, Main Market, Lahore</string>
+    <string name="device_name_label">Primary Tablet Name</string>
+    <string name="device_name_hint">e.g. Counter 1 Main Terminal</string>
+    <string name="btn_initialize_shop">Initialize POS &amp; Register Primary Hub</string>
+
+    <!-- Products -->
+    <string name="products_title">Product Catalog</string>
+    <string name="search_products_hint">Search by name, SKU, or barcode…</string>
+    <string name="btn_add_product">Add Product</string>
+    <string name="empty_products_title">No Products Found</string>
+    <string name="empty_products_desc">Add your first grocery product or scan a barcode to get started.</string>
+    <string name="status_active">Active</string>
+    <string name="status_inactive">Inactive</string>
+    <string name="btn_edit">Edit</string>
+    <string name="btn_activate">Activate</string>
+    <string name="btn_deactivate">Deactivate</string>
+    <string name="selling_price_label">Selling Price</string>
+    <string name="min_stock_label">Min Stock</string>
+    <string name="sku_label">SKU</string>
+    <string name="category_label">Category</string>
+    <string name="brand_label">Brand</string>
+    <string name="barcode_label">Barcode</string>
+    <string name="unit_label">Unit</string>
+
+    <!-- Add/Edit Product Form -->
+    <string name="add_product_title">New Product</string>
+    <string name="edit_product_title">Edit Product</string>
+    <string name="product_name_label">Product Name *</string>
+    <string name="product_name_hint">e.g. Tapal Danedar Tea 430g</string>
+    <string name="category_select_label">Category *</string>
+    <string name="brand_hint">e.g. Tapal, Nestle, Shan</string>
+    <string name="sku_hint">e.g. BEV-TAP-430</string>
+    <string name="base_unit_label">Base Unit (Inventory) *</string>
+    <string name="selling_unit_label">Selling Unit (Point of Sale) *</string>
+    <string name="conversion_factor_label">Conversion Factor</string>
+    <string name="conversion_factor_help">How many base units per selling unit (e.g. 1.0 for pieces, 1000 for kg to grams)</string>
+    <string name="price_pkr_label">Selling Price (PKR) *</string>
+    <string name="min_stock_hint">Alert threshold (e.g. 5)</string>
+    <string name="barcode_hint">Enter or scan barcode (e.g. 8964000123456)</string>
+    <string name="track_expiry_label">Track Expiration Dates</string>
+    <string name="track_batch_label">Track Batch / Lot Numbers</string>
+    <string name="btn_save_product">Save Product</string>
+    <string name="btn_cancel">Cancel</string>
+
+    <!-- Settings -->
+    <string name="settings_title">POS Settings</string>
+    <string name="section_shop_info">Shop Information</string>
+    <string name="section_device_info">Device &amp; Network Architecture</string>
+    <string name="section_database">Local Database (Room SQLite)</string>
+    <string name="currency_pkr">PKR (Pakistani Rupee)</string>
+    <string name="timezone_karachi">Asia/Karachi (PKT)</string>
+    <string name="db_source_of_truth">Source of Truth: Local SQLite Database</string>
+    <string name="db_version_label">Database Schema Version: 1</string>
+    <string name="reset_demo_data">Reset / Seed Sample Data</string>
+
+    <!-- Validation & Errors -->
+    <string name="error_required">This field is required</string>
+    <string name="error_invalid_price">Price must be greater than 0</string>
+    <string name="error_barcode_duplicate">This barcode is already assigned to another product in your shop</string>
+    <string name="success_product_saved">Product saved successfully</string>
+</resources>

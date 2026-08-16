@@ -1,0 +1,6 @@
+{
+  "name": "Grocery POS — V1",
+  "description": "Offline-first, local-first Android POS application and database foundation for grocery stores in Pakistan.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
