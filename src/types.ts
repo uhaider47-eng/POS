@@ -95,6 +95,7 @@ export interface Barcode {
   shopId: string;
 }
 
+// Stored as integer minor units (100 minor units = Rs. 1.00) & scaled units (1000 scaled = 1.000)
 export interface Product {
   productId: string;
   shopId: string;
@@ -105,8 +106,8 @@ export interface Product {
   baseUnitId: string;
   sellingUnitId: string;
   conversionFactor: number;
-  sellingPrice: number;
-  minimumStock: number;
+  sellingPriceMinorUnits: number; // e.g. 24500 for Rs. 245.00
+  minimumStockScaledUnits: number; // e.g. 10000 for 10.000 units
   trackExpiry: boolean;
   trackBatch: boolean;
   isActive: boolean;
@@ -118,7 +119,7 @@ export interface Product {
 export interface PriceHistory {
   priceHistoryId: string;
   productId: string;
-  sellingPrice: number;
+  sellingPriceMinorUnits: number;
   effectiveFrom: number;
   effectiveTo?: number | null;
   changedBy?: string | null;
@@ -127,8 +128,8 @@ export interface PriceHistory {
 
 export interface StockBalance {
   productId: string;
-  quantity: number;
-  averageCost: number;
+  quantityScaledUnits: number; // e.g. 42000 for 42.000
+  averageCostMinorUnits: number; // e.g. 20000 for Rs. 200.00
   updatedAt: number;
 }
 
@@ -139,8 +140,8 @@ export interface StockMovement {
   productId: string;
   batchId?: string | null;
   movementType: MovementType;
-  quantity: number;
-  unitCost: number;
+  quantityScaledUnits: number;
+  unitCostMinorUnits: number;
   referenceType?: string | null;
   referenceId?: string | null;
   createdBy: string;
@@ -153,7 +154,7 @@ export interface Customer {
   name: string;
   phone: string;
   address: string;
-  creditLimit: number;
+  creditLimitMinorUnits: number;
   notes: string;
   isActive: boolean;
   createdAt: number;
@@ -174,6 +175,7 @@ export interface Supplier {
 
 export interface TestResult {
   id: number;
+  category: 'FINANCIAL_PRECISION' | 'QUANTITY_SCALE' | 'ATOMIC_TRANSACTION' | 'DB_MIGRATION' | 'ROOM_INTEGRITY';
   title: string;
   description: string;
   passed: boolean;

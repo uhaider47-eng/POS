@@ -4,6 +4,7 @@ import com.example.grocerypos.domain.model.Category
 import com.example.grocerypos.domain.model.Device
 import com.example.grocerypos.domain.model.DeviceStatus
 import com.example.grocerypos.domain.model.DeviceType
+import com.example.grocerypos.domain.model.Money
 import com.example.grocerypos.domain.model.Product
 import com.example.grocerypos.domain.model.Shop
 import com.example.grocerypos.domain.repository.CategoryRepository
@@ -117,7 +118,7 @@ class SaveProductUseCase @Inject constructor(
         if (product.name.isBlank()) {
             return Result.failure(IllegalArgumentException("Product name cannot be blank."))
         }
-        if (product.sellingPrice <= 0.0) {
+        if (!product.sellingPrice.isPositive()) {
             return Result.failure(IllegalArgumentException("Selling price must be greater than zero."))
         }
         if (product.conversionFactor <= 0.0) {

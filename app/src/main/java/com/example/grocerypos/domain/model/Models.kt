@@ -74,6 +74,14 @@ data class Device(
 )
 
 @Serializable
+data class Role(
+    val roleId: String,
+    val name: RoleName,
+    val description: String,
+    val permissions: Set<AppPermission> = emptySet()
+)
+
+@Serializable
 data class Category(
     val categoryId: String,
     val shopId: String,
@@ -104,8 +112,8 @@ data class Product(
     val baseUnitId: String,
     val sellingUnitId: String,
     val conversionFactor: Double = 1.0,
-    val sellingPrice: Double,
-    val minimumStock: Double = 0.0,
+    val sellingPrice: Money,
+    val minimumStock: Quantity = Quantity.ZERO,
     val trackExpiry: Boolean = false,
     val trackBatch: Boolean = false,
     val isActive: Boolean = true,
@@ -127,7 +135,7 @@ data class Barcode(
 data class PriceHistory(
     val priceHistoryId: String,
     val productId: String,
-    val sellingPrice: Double,
+    val sellingPrice: Money,
     val effectiveFrom: Long = System.currentTimeMillis(),
     val effectiveTo: Long? = null,
     val changedBy: String? = null,
@@ -137,7 +145,50 @@ data class PriceHistory(
 @Serializable
 data class StockBalance(
     val productId: String,
-    val quantity: Double,
-    val averageCost: Double = 0.0,
+    val quantity: Quantity = Quantity.ZERO,
+    val averageCost: Money = Money.ZERO,
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+data class StockMovement(
+    val movementId: String,
+    val shopId: String,
+    val deviceId: String,
+    val productId: String,
+    val batchId: String? = null,
+    val movementType: MovementType,
+    val quantity: Quantity,
+    val unitCost: Money = Money.ZERO,
+    val referenceType: String? = null,
+    val referenceId: String? = null,
+    val createdBy: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+data class Customer(
+    val customerId: String,
+    val shopId: String,
+    val name: String,
+    val phone: String,
+    val address: String = "",
+    val creditLimit: Money = Money.ZERO,
+    val notes: String = "",
+    val isActive: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+data class Supplier(
+    val supplierId: String,
+    val shopId: String,
+    val name: String,
+    val phone: String,
+    val address: String = "",
+    val notes: String = "",
+    val isActive: Boolean = true,
+    val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

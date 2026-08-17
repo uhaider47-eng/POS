@@ -18,7 +18,7 @@ import javax.inject.Inject
 data class SettingsUiState(
     val shop: Shop? = null,
     val primaryDevice: Device? = null,
-    val databaseVersion: Int = 1,
+    val databaseVersion: Int = 2,
     val databaseName: String = "grocery_pos_db",
     val isLoading: Boolean = true
 )

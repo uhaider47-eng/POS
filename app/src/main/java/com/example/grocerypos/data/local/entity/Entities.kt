@@ -7,7 +7,9 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.example.grocerypos.domain.model.DeviceStatus
 import com.example.grocerypos.domain.model.DeviceType
+import com.example.grocerypos.domain.model.Money
 import com.example.grocerypos.domain.model.MovementType
+import com.example.grocerypos.domain.model.Quantity
 import com.example.grocerypos.domain.model.RoleName
 import com.example.grocerypos.domain.model.UnitCode
 
@@ -288,10 +290,10 @@ data class ProductEntity(
     val conversionFactor: Double = 1.0,
 
     @ColumnInfo(name = "selling_price")
-    val sellingPrice: Double,
+    val sellingPrice: Money,
 
     @ColumnInfo(name = "minimum_stock")
-    val minimumStock: Double = 0.0,
+    val minimumStock: Quantity = Quantity.ZERO,
 
     @ColumnInfo(name = "track_expiry")
     val trackExpiry: Boolean = false,
@@ -373,7 +375,7 @@ data class PriceHistoryEntity(
     val productId: String,
 
     @ColumnInfo(name = "selling_price")
-    val sellingPrice: Double,
+    val sellingPrice: Money,
 
     @ColumnInfo(name = "effective_from")
     val effectiveFrom: Long,
@@ -405,10 +407,10 @@ data class StockBalanceEntity(
     val productId: String,
 
     @ColumnInfo(name = "quantity")
-    val quantity: Double,
+    val quantity: Quantity = Quantity.ZERO,
 
     @ColumnInfo(name = "average_cost")
-    val averageCost: Double = 0.0,
+    val averageCost: Money = Money.ZERO,
 
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long
@@ -464,10 +466,10 @@ data class StockMovementEntity(
     val movementType: MovementType,
 
     @ColumnInfo(name = "quantity")
-    val quantity: Double,
+    val quantity: Quantity,
 
     @ColumnInfo(name = "unit_cost")
-    val unitCost: Double,
+    val unitCost: Money = Money.ZERO,
 
     @ColumnInfo(name = "reference_type")
     val referenceType: String? = null,
@@ -517,7 +519,7 @@ data class CustomerEntity(
     val address: String = "",
 
     @ColumnInfo(name = "credit_limit")
-    val creditLimit: Double = 0.0,
+    val creditLimit: Money = Money.ZERO,
 
     @ColumnInfo(name = "notes")
     val notes: String = "",

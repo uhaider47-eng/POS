@@ -15,6 +15,8 @@ import com.example.grocerypos.data.local.dao.SupplierDao
 import com.example.grocerypos.data.local.dao.UnitDao
 import com.example.grocerypos.data.local.dao.UserDao
 import com.example.grocerypos.data.local.database.GroceryPosDatabase
+import com.example.grocerypos.data.local.database.RoomTransactionRunner
+import com.example.grocerypos.domain.transaction.TransactionRunner
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -40,6 +42,12 @@ object DatabaseModule {
         scope: CoroutineScope
     ): GroceryPosDatabase {
         return GroceryPosDatabase.buildDatabase(context, scope)
+    }
+
+    @Provides
+    @Singleton
+    fun provideTransactionRunner(db: GroceryPosDatabase): TransactionRunner {
+        return RoomTransactionRunner(db)
     }
 
     @Provides

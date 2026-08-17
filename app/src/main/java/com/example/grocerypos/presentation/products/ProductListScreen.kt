@@ -268,7 +268,7 @@ private fun ProductRowCard(
 
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = "PKR ${String.format("%.2f", product.sellingPrice)}",
+                    text = product.sellingPrice.toFormattedRupees(),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.primary
