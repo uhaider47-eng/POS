@@ -56,7 +56,7 @@ import kotlinx.coroutines.launch
         CustomerEntity::class,
         SupplierEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -78,7 +78,7 @@ abstract class GroceryPosDatabase : RoomDatabase() {
 
     companion object {
         const val DATABASE_NAME = "grocery_pos_db"
-        const val DATABASE_VERSION = 2
+        const val DATABASE_VERSION = 3
 
         /**
          * MIGRATION_1_2:
@@ -239,13 +239,63 @@ abstract class GroceryPosDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * MIGRATION_2_3:
+         * Converts Product.conversion_factor from SQLite REAL to INTEGER (scale 3 fixed-point Quantity, multiplied by 1000).
+         * Eliminates floating point types from all database columns.
+         * Preserves all existing product catalog records without data loss.
+         */
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `products_new` (
+                        `product_id` TEXT NOT NULL PRIMARY KEY,
+                        `shop_id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `category_id` TEXT NOT NULL,
+                        `brand` TEXT NOT NULL,
+                        `sku` TEXT NOT NULL,
+                        `base_unit_id` TEXT NOT NULL,
+                        `selling_unit_id` TEXT NOT NULL,
+                        `conversion_factor` INTEGER NOT NULL,
+                        `selling_price` INTEGER NOT NULL,
+                        `minimum_stock` INTEGER NOT NULL,
+                        `track_expiry` INTEGER NOT NULL,
+                        `track_batch` INTEGER NOT NULL,
+                        `is_active` INTEGER NOT NULL,
+                        `created_at` INTEGER NOT NULL,
+                        `updated_at` INTEGER NOT NULL,
+                        FOREIGN KEY(`shop_id`) REFERENCES `shops`(`shop_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`category_id`) REFERENCES `categories`(`category_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`base_unit_id`) REFERENCES `units`(`unit_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`selling_unit_id`) REFERENCES `units`(`unit_id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("""
+                    INSERT INTO `products_new` SELECT
+                        `product_id`, `shop_id`, `name`, `category_id`, `brand`, `sku`, `base_unit_id`, `selling_unit_id`,
+                        CAST(ROUND(`conversion_factor` * 1000) AS INTEGER),
+                        `selling_price`, `minimum_stock`, `track_expiry`, `track_batch`, `is_active`, `created_at`, `updated_at`
+                    FROM `products`
+                """.trimIndent())
+                db.execSQL("DROP TABLE `products`")
+                db.execSQL("ALTER TABLE `products_new` RENAME TO `products`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_products_shop_id` ON `products` (`shop_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_products_name` ON `products` (`name`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_products_sku` ON `products` (`sku`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_products_category_id` ON `products` (`category_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_products_shop_id_name` ON `products` (`shop_id`, `name`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_products_shop_id_sku` ON `products` (`shop_id`, `sku`)")
+            }
+        }
+
         fun buildDatabase(context: Context, scope: CoroutineScope): GroceryPosDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
                 GroceryPosDatabase::class.java,
                 DATABASE_NAME
             )
-                .addMigrations(MIGRATION_1_2)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                 .addCallback(DatabaseCallback(scope))
                 .build()
         }

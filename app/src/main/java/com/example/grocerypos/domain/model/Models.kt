@@ -111,7 +111,7 @@ data class Product(
     val sku: String = "",
     val baseUnitId: String,
     val sellingUnitId: String,
-    val conversionFactor: Double = 1.0,
+    val conversionFactor: Quantity = Quantity.ONE,
     val sellingPrice: Money,
     val minimumStock: Quantity = Quantity.ZERO,
     val trackExpiry: Boolean = false,

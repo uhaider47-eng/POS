@@ -33,10 +33,32 @@ data class Quantity(
         return Quantity(Math.multiplyExact(amountInScaledUnits, scalar))
     }
 
+    /**
+     * Divides this quantity by a non-zero scalar [divisor] using deterministic
+     * fixed-point HALF_UP integer rounding (symmetric rounding away from zero at 0.5):
+     *
+     *   result = sign * ((|amountInScaledUnits| + |divisor| / 2) / |divisor|)
+     *
+     * Rounding Policy:
+     * - Exact divisions produce the precise quotient (e.g. 6.000 / 2 = 3.000).
+     * - Inexact divisions round to the nearest scaled unit (0.001).
+     * - Halfway fractions (0.5 scaled unit remainder) round away from zero (e.g. 1.000 / 3 = 0.333, 2.000 / 3 = 0.667).
+     * - Values below the minimum supported precision (0.001) round up to 0.001 if >= 0.0005, or down to 0.000 otherwise.
+     * - Division by zero throws [ArithmeticException].
+     * - Negative quantities round symmetrically away from zero.
+     */
     operator fun div(divisor: Long): Quantity {
-        require(divisor != 0L) { "Cannot divide Quantity by zero" }
-        return Quantity(amountInScaledUnits / divisor)
+        if (divisor == 0L) {
+            throw ArithmeticException("Cannot divide Quantity by zero")
+        }
+        val isNegative = (amountInScaledUnits < 0) xor (divisor < 0)
+        val absN = kotlin.math.abs(amountInScaledUnits)
+        val absD = kotlin.math.abs(divisor)
+        val roundedScaledUnits = (absN + absD / 2L) / absD
+        return Quantity(if (isNegative && roundedScaledUnits != 0L) -roundedScaledUnits else roundedScaledUnits)
     }
+
+    operator fun div(divisor: Int): Quantity = div(divisor.toLong())
 
     operator fun unaryMinus(): Quantity {
         return Quantity(-amountInScaledUnits)

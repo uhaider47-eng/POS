@@ -287,7 +287,7 @@ data class ProductEntity(
     val sellingUnitId: String,
 
     @ColumnInfo(name = "conversion_factor")
-    val conversionFactor: Double = 1.0,
+    val conversionFactor: Quantity = Quantity.ONE,
 
     @ColumnInfo(name = "selling_price")
     val sellingPrice: Money,

@@ -175,7 +175,7 @@ class DatabaseTest {
             sku = "TAP-430",
             baseUnitId = testBaseUnitId,
             sellingUnitId = testBaseUnitId,
-            conversionFactor = 1.0,
+            conversionFactor = Quantity.ONE,
             sellingPrice = Money.parseOrDefault("650.50"), // 65050 minor units
             minimumStock = Quantity.fromWholeUnits(5),    // 5000 scaled units
             trackExpiry = true,
@@ -219,7 +219,7 @@ class DatabaseTest {
             sku = "HAM-RA-800",
             baseUnitId = testBaseUnitId,
             sellingUnitId = testBaseUnitId,
-            conversionFactor = 1.0,
+            conversionFactor = Quantity.ONE,
             sellingPrice = Money.parseOrDefault("450.00"),
             minimumStock = Quantity.fromWholeUnits(10),
             trackExpiry = true,
@@ -239,6 +239,7 @@ class DatabaseTest {
         val savedProduct = productDao.getProductById(productId)
         assertNotNull(savedProduct)
         assertEquals(Money.fromRupees(450), savedProduct?.sellingPrice)
+        assertEquals(Quantity.ONE, savedProduct?.conversionFactor)
 
         // 2. Barcode table
         val barcodes = barcodeDao.getBarcodesForProduct(productId)
@@ -353,5 +354,138 @@ class DatabaseTest {
 
         val rolledBackPrice = priceHistoryDao.getCurrentPrice(prod2Id)
         assertNull(rolledBackPrice)
+    }
+
+    // 7. Direct TransactionRunner rollback on unexpected runtime exception
+    @Test
+    fun test7_directTransactionRollbackOnException() = runBlocking {
+        test1_shopCreation()
+
+        val tempCategoryId = UUID.randomUUID().toString()
+        val tempProductId = UUID.randomUUID().toString()
+
+        var caughtException = false
+        try {
+            transactionRunner.runInTransaction {
+                // Step 1: Insert category
+                categoryDao.insertCategory(
+                    CategoryEntity(
+                        categoryId = tempCategoryId,
+                        shopId = testShopId,
+                        name = "Temporary Category",
+                        parentCategoryId = null,
+                        isActive = true,
+                        createdAt = System.currentTimeMillis(),
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+
+                // Step 2: Insert product
+                productDao.insertProduct(
+                    ProductEntity(
+                        productId = tempProductId,
+                        shopId = testShopId,
+                        name = "Temporary Product",
+                        categoryId = tempCategoryId,
+                        brand = "Brand",
+                        sku = "TEMP-1",
+                        baseUnitId = testBaseUnitId,
+                        sellingUnitId = testBaseUnitId,
+                        conversionFactor = Quantity.fromWholeUnits(12),
+                        sellingPrice = Money.fromRupees(150),
+                        minimumStock = Quantity.ZERO,
+                        trackExpiry = false,
+                        trackBatch = false,
+                        isActive = true,
+                        createdAt = System.currentTimeMillis(),
+                        updatedAt = System.currentTimeMillis()
+                    )
+                )
+
+                // Step 3: Simulate catastrophic failure midway through transaction
+                throw IllegalStateException("Simulated mid-transaction failure")
+            }
+        } catch (e: IllegalStateException) {
+            caughtException = true
+        }
+
+        assertTrue("Expected transaction exception was not thrown", caughtException)
+
+        // Verify ACID Atomicity: neither the category nor the product should exist in the database
+        assertNull("Category must be rolled back", categoryDao.getCategoryById(tempCategoryId))
+        assertNull("Product must be rolled back", productDao.getProductById(tempProductId))
+    }
+
+    // 8. Deterministic fixed-point conversion factor persistence
+    @Test
+    fun test8_fixedPointConversionFactorPersistence() = runBlocking {
+        test1_shopCreation()
+
+        val category = CategoryEntity(
+            categoryId = testCategoryId,
+            shopId = testShopId,
+            name = "Packaged Goods",
+            parentCategoryId = null,
+            isActive = true,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        categoryDao.insertCategory(category)
+
+        val cartonProductId = UUID.randomUUID().toString()
+        // 1 Carton = 24 Pieces (conversion factor 24.000 -> 24000 scaled units)
+        val cartonProduct = ProductEntity(
+            productId = cartonProductId,
+            shopId = testShopId,
+            name = "Biscuits Box 24-Pack",
+            categoryId = testCategoryId,
+            brand = "LU",
+            sku = "LU-BOX-24",
+            baseUnitId = testBaseUnitId,
+            sellingUnitId = testBaseUnitId,
+            conversionFactor = Quantity.fromWholeUnits(24),
+            sellingPrice = Money.fromRupees(1200),
+            minimumStock = Quantity.fromWholeUnits(2),
+            trackExpiry = true,
+            trackBatch = false,
+            isActive = true,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        productDao.insertProduct(cartonProduct)
+
+        val retrieved = productDao.getProductById(cartonProductId)
+        assertNotNull(retrieved)
+        assertEquals(24000L, retrieved?.conversionFactor?.amountInScaledUnits)
+        assertEquals(Quantity.fromWholeUnits(24), retrieved?.conversionFactor)
+        assertEquals("24", retrieved?.conversionFactor?.toFormattedString())
+
+        // Fractional conversion factor: 1 Half-Kg pack = 0.500 kg (500 scaled units)
+        val halfKgProductId = UUID.randomUUID().toString()
+        val halfKgProduct = ProductEntity(
+            productId = halfKgProductId,
+            shopId = testShopId,
+            name = "Sugar 500g Pack",
+            categoryId = testCategoryId,
+            brand = "SugarMills",
+            sku = "SUG-500G",
+            baseUnitId = testBaseUnitId,
+            sellingUnitId = testBaseUnitId,
+            conversionFactor = Quantity.fromScaledUnits(500),
+            sellingPrice = Money.fromRupees(75),
+            minimumStock = Quantity.fromWholeUnits(10),
+            trackExpiry = false,
+            trackBatch = false,
+            isActive = true,
+            createdAt = System.currentTimeMillis(),
+            updatedAt = System.currentTimeMillis()
+        )
+        productDao.insertProduct(halfKgProduct)
+
+        val retrievedHalfKg = productDao.getProductById(halfKgProductId)
+        assertNotNull(retrievedHalfKg)
+        assertEquals(500L, retrievedHalfKg?.conversionFactor?.amountInScaledUnits)
+        assertEquals(Quantity.fromScaledUnits(500), retrievedHalfKg?.conversionFactor)
+        assertEquals("0.5", retrievedHalfKg?.conversionFactor?.toFormattedString())
     }
 }

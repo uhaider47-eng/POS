@@ -121,7 +121,7 @@ class SaveProductUseCase @Inject constructor(
         if (!product.sellingPrice.isPositive()) {
             return Result.failure(IllegalArgumentException("Selling price must be greater than zero."))
         }
-        if (product.conversionFactor <= 0.0) {
+        if (!product.conversionFactor.isPositive()) {
             return Result.failure(IllegalArgumentException("Conversion factor must be greater than zero."))
         }
         return productRepository.saveProduct(product, changedBy)

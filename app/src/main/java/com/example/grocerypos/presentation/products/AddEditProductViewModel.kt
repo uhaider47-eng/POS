@@ -100,7 +100,7 @@ class AddEditProductViewModel @Inject constructor(
                             sku = existingProduct.sku,
                             baseUnitId = existingProduct.baseUnitId,
                             sellingUnitId = existingProduct.sellingUnitId,
-                            conversionFactor = existingProduct.conversionFactor.toString(),
+                            conversionFactor = existingProduct.conversionFactor.toFormattedString(),
                             sellingPrice = existingProduct.sellingPrice.toPlainDecimalString(),
                             minimumStock = existingProduct.minimumStock.toFormattedString(),
                             barcode = primaryBarcode,
@@ -155,8 +155,8 @@ class AddEditProductViewModel @Inject constructor(
         }
 
         val minStock = Quantity.parseOrDefault(state.minimumStock, Quantity.ZERO)
-        val conversion = state.conversionFactor.toDoubleOrNull() ?: 1.0
-        if (conversion <= 0.0) {
+        val conversion = Quantity.parseOrNull(state.conversionFactor)
+        if (conversion == null || !conversion.isPositive()) {
             _uiState.update { it.copy(errorMessage = "Conversion factor must be greater than 0") }
             return
         }

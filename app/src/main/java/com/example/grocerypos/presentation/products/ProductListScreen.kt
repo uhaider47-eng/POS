@@ -259,7 +259,7 @@ private fun ProductRowCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = " • Unit: ${item.sellingUnitSymbol.ifEmpty { "pc" }} (Ratio: ${product.conversionFactor})",
+                        text = " • Unit: ${item.sellingUnitSymbol.ifEmpty { "pc" }} (Ratio: ${product.conversionFactor.toFormattedString()})",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
