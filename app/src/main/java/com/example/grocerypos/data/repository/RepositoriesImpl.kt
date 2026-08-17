@@ -3,6 +3,7 @@ package com.example.grocerypos.data.repository
 import com.example.grocerypos.data.local.dao.BarcodeDao
 import com.example.grocerypos.data.local.dao.CategoryDao
 import com.example.grocerypos.data.local.dao.DeviceDao
+import com.example.grocerypos.data.local.dao.InvoiceSequenceDao
 import com.example.grocerypos.data.local.dao.PriceHistoryDao
 import com.example.grocerypos.data.local.dao.ProductDao
 import com.example.grocerypos.data.local.dao.RoleDao
@@ -13,6 +14,7 @@ import com.example.grocerypos.data.local.dao.UserDao
 import com.example.grocerypos.data.local.entity.BarcodeEntity
 import com.example.grocerypos.data.local.entity.CategoryEntity
 import com.example.grocerypos.data.local.entity.DeviceEntity
+import com.example.grocerypos.data.local.entity.InvoiceSequenceEntity
 import com.example.grocerypos.data.local.entity.PriceHistoryEntity
 import com.example.grocerypos.data.local.entity.ProductEntity
 import com.example.grocerypos.data.local.entity.ShopEntity
@@ -24,6 +26,7 @@ import com.example.grocerypos.domain.model.Barcode
 import com.example.grocerypos.domain.model.Category
 import com.example.grocerypos.domain.model.Device
 import com.example.grocerypos.domain.model.DeviceStatus
+import com.example.grocerypos.domain.model.InvoiceSequence
 import com.example.grocerypos.domain.model.Money
 import com.example.grocerypos.domain.model.PriceHistory
 import com.example.grocerypos.domain.model.Product
@@ -33,6 +36,7 @@ import com.example.grocerypos.domain.model.StockBalance
 import com.example.grocerypos.domain.model.Unit
 import com.example.grocerypos.domain.repository.CategoryRepository
 import com.example.grocerypos.domain.repository.DeviceRepository
+import com.example.grocerypos.domain.repository.InvoiceSequenceRepository
 import com.example.grocerypos.domain.repository.ProductRepository
 import com.example.grocerypos.domain.repository.ShopRepository
 import com.example.grocerypos.domain.repository.UnitRepository
@@ -465,3 +469,39 @@ class ProductRepositoryImpl @Inject constructor(
         updatedAt = updatedAt
     )
 }
+
+@Singleton
+class InvoiceSequenceRepositoryImpl @Inject constructor(
+    private val invoiceSequenceDao: InvoiceSequenceDao,
+    private val transactionRunner: TransactionRunner
+) : InvoiceSequenceRepository {
+
+    override suspend fun allocateNextInvoiceNumber(shopId: String, defaultPrefix: String): Result<String> = runCatching {
+        transactionRunner.runInTransaction {
+            invoiceSequenceDao.allocateNextInvoiceNumber(shopId = shopId, defaultPrefix = defaultPrefix)
+        }
+    }
+
+    override suspend fun getSequence(shopId: String): InvoiceSequence? {
+        return invoiceSequenceDao.getSequence(shopId)?.let {
+            InvoiceSequence(
+                shopId = it.shopId,
+                nextNumber = it.nextNumber,
+                prefix = it.prefix,
+                updatedAt = it.updatedAt
+            )
+        }
+    }
+
+    override suspend fun initializeSequence(shopId: String, startNumber: Long, prefix: String): Result<kotlin.Unit> = runCatching {
+        invoiceSequenceDao.upsertSequence(
+            InvoiceSequenceEntity(
+                shopId = shopId,
+                nextNumber = startNumber,
+                prefix = prefix,
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+    }
+}
+

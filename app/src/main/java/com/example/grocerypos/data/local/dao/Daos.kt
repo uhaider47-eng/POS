@@ -396,13 +396,49 @@ interface SyncEventDao {
 }
 
 @Dao
-interface InvoiceSequenceDao {
+abstract class InvoiceSequenceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertSequence(sequence: InvoiceSequenceEntity)
+    abstract suspend fun upsertSequence(sequence: InvoiceSequenceEntity)
 
     @Query("SELECT * FROM invoice_sequences WHERE shop_id = :shopId LIMIT 1")
-    suspend fun getSequence(shopId: String): InvoiceSequenceEntity?
+    abstract suspend fun getSequence(shopId: String): InvoiceSequenceEntity?
 
     @Query("UPDATE invoice_sequences SET next_number = next_number + 1, updated_at = :updatedAt WHERE shop_id = :shopId")
-    suspend fun incrementNextNumber(shopId: String, updatedAt: Long)
+    abstract suspend fun incrementNextNumber(shopId: String, updatedAt: Long)
+
+    /**
+     * Atomically allocates the next invoice number for a shop within a single transaction.
+     * The allocated number is formatted based on the sequence's prefix and the sequence number BEFORE incrementing.
+     * The sequence's next_number is incremented atomically.
+     */
+    @Transaction
+    open suspend fun allocateNextInvoiceNumber(
+        shopId: String,
+        defaultPrefix: String = "INV-",
+        paddingDigits: Int = 6
+    ): String {
+        val now = System.currentTimeMillis()
+        val currentSeq = getSequence(shopId)
+        val allocatedNumber: Long
+        val prefix: String
+
+        if (currentSeq == null) {
+            allocatedNumber = 1L
+            prefix = defaultPrefix
+            val initial = InvoiceSequenceEntity(
+                shopId = shopId,
+                nextNumber = 2L,
+                prefix = defaultPrefix,
+                updatedAt = now
+            )
+            upsertSequence(initial)
+        } else {
+            allocatedNumber = currentSeq.nextNumber
+            prefix = currentSeq.prefix
+            incrementNextNumber(shopId, now)
+        }
+
+        val formattedNumber = allocatedNumber.toString().padStart(paddingDigits, '0')
+        return "$prefix$formattedNumber"
+    }
 }

@@ -9,6 +9,7 @@ import com.example.grocerypos.domain.model.Product
 import com.example.grocerypos.domain.model.Shop
 import com.example.grocerypos.domain.repository.CategoryRepository
 import com.example.grocerypos.domain.repository.DeviceRepository
+import com.example.grocerypos.domain.repository.InvoiceSequenceRepository
 import com.example.grocerypos.domain.repository.ProductRepository
 import com.example.grocerypos.domain.repository.ShopRepository
 import com.example.grocerypos.domain.repository.UnitRepository
@@ -135,3 +136,16 @@ class ToggleProductStatusUseCase @Inject constructor(
         return productRepository.setProductActiveStatus(productId, !currentActive)
     }
 }
+
+/**
+ * UseCase for allocating sequential invoice numbers atomically within a database transaction.
+ * Ensures the primary device sequence increments safely and provides collision-free invoice numbers.
+ */
+class AllocateInvoiceNumberUseCase @Inject constructor(
+    private val invoiceSequenceRepository: InvoiceSequenceRepository
+) {
+    suspend operator fun invoke(shopId: String, defaultPrefix: String = "INV-"): Result<String> {
+        return invoiceSequenceRepository.allocateNextInvoiceNumber(shopId = shopId, defaultPrefix = defaultPrefix)
+    }
+}
+

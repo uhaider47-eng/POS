@@ -2,11 +2,13 @@ package com.example.grocerypos.di
 
 import com.example.grocerypos.data.repository.CategoryRepositoryImpl
 import com.example.grocerypos.data.repository.DeviceRepositoryImpl
+import com.example.grocerypos.data.repository.InvoiceSequenceRepositoryImpl
 import com.example.grocerypos.data.repository.ProductRepositoryImpl
 import com.example.grocerypos.data.repository.ShopRepositoryImpl
 import com.example.grocerypos.data.repository.UnitRepositoryImpl
 import com.example.grocerypos.domain.repository.CategoryRepository
 import com.example.grocerypos.domain.repository.DeviceRepository
+import com.example.grocerypos.domain.repository.InvoiceSequenceRepository
 import com.example.grocerypos.domain.repository.ProductRepository
 import com.example.grocerypos.domain.repository.ShopRepository
 import com.example.grocerypos.domain.repository.UnitRepository
@@ -39,4 +41,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindProductRepository(impl: ProductRepositoryImpl): ProductRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindInvoiceSequenceRepository(impl: InvoiceSequenceRepositoryImpl): InvoiceSequenceRepository
 }

@@ -52,12 +52,17 @@ import com.example.grocerypos.domain.model.SaleStatus
 import com.example.grocerypos.domain.model.SyncOperation
 import com.example.grocerypos.domain.model.SyncStatus
 import com.example.grocerypos.domain.model.UnitCode
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -404,25 +409,358 @@ class SalesDatabaseTest {
     }
 
     @Test
-    fun testInvoiceSequenceUpsertAndIncrement() = runBlocking {
-        val now = System.currentTimeMillis()
+    fun testFirstInvoiceAllocationReturnsCurrentNumberAndIncrementsSequence() = runBlocking {
+        // Shop has no prior sequence
+        val allocated = invoiceSequenceDao.allocateNextInvoiceNumber(testShopId, defaultPrefix = "INV-")
+        assertEquals("INV-000001", allocated)
 
-        val seq = InvoiceSequenceEntity(
+        val seq = invoiceSequenceDao.getSequence(testShopId)
+        assertNotNull(seq)
+        assertEquals(2L, seq?.nextNumber)
+        assertEquals("INV-", seq?.prefix)
+    }
+
+    @Test
+    fun testSubsequentInvoiceAllocationReturnsNextNumber() = runBlocking {
+        val first = invoiceSequenceDao.allocateNextInvoiceNumber(testShopId, defaultPrefix = "INV-")
+        val second = invoiceSequenceDao.allocateNextInvoiceNumber(testShopId, defaultPrefix = "INV-")
+        val third = invoiceSequenceDao.allocateNextInvoiceNumber(testShopId, defaultPrefix = "INV-")
+
+        assertEquals("INV-000001", first)
+        assertEquals("INV-000002", second)
+        assertEquals("INV-000003", third)
+
+        val seq = invoiceSequenceDao.getSequence(testShopId)
+        assertEquals(4L, seq?.nextNumber)
+    }
+
+    @Test
+    fun testDuplicateNonNullInvoiceNumberWithinSameShopIsRejected() = runBlocking {
+        val now = System.currentTimeMillis()
+        val sale1 = SaleEntity(
+            saleId = UUID.randomUUID().toString(),
             shopId = testShopId,
-            nextNumber = 1L,
-            prefix = "INV-",
+            deviceId = testDeviceId,
+            invoiceNumber = "INV-000999",
+            cashierId = testUserId,
+            customerId = testCustomerId,
+            subtotal = Money.fromRupees(500),
+            itemDiscount = Money.ZERO,
+            saleDiscount = Money.ZERO,
+            tax = Money.ZERO,
+            grandTotal = Money.fromRupees(500),
+            paidAmount = Money.fromRupees(500),
+            dueAmount = Money.ZERO,
+            status = SaleStatus.COMPLETED,
+            paymentStatus = PaymentStatus.PAID,
+            notes = "",
+            createdAt = now,
+            completedAt = now,
             updatedAt = now
         )
-        invoiceSequenceDao.upsertSequence(seq)
+        saleDao.insertSale(sale1)
 
-        val retrieved = invoiceSequenceDao.getSequence(testShopId)
-        assertNotNull(retrieved)
-        assertEquals(1L, retrieved?.nextNumber)
-        assertEquals("INV-", retrieved?.prefix)
+        val sale2WithSameInvoice = SaleEntity(
+            saleId = UUID.randomUUID().toString(),
+            shopId = testShopId,
+            deviceId = testDeviceId,
+            invoiceNumber = "INV-000999",
+            cashierId = testUserId,
+            customerId = testCustomerId,
+            subtotal = Money.fromRupees(300),
+            itemDiscount = Money.ZERO,
+            saleDiscount = Money.ZERO,
+            tax = Money.ZERO,
+            grandTotal = Money.fromRupees(300),
+            paidAmount = Money.fromRupees(300),
+            dueAmount = Money.ZERO,
+            status = SaleStatus.COMPLETED,
+            paymentStatus = PaymentStatus.PAID,
+            notes = "",
+            createdAt = now + 10,
+            completedAt = now + 10,
+            updatedAt = now + 10
+        )
 
-        // Increment sequence
-        invoiceSequenceDao.incrementNextNumber(testShopId, now + 100)
-        val updated = invoiceSequenceDao.getSequence(testShopId)
-        assertEquals(2L, updated?.nextNumber)
+        try {
+            saleDao.insertSale(sale2WithSameInvoice)
+            fail("Expected SQLiteConstraintException on duplicate (shop_id, invoice_number)")
+        } catch (e: android.database.sqlite.SQLiteConstraintException) {
+            // Expected
+            assertTrue(true)
+        }
+    }
+
+    @Test
+    fun testSameInvoiceNumberMayExistInDifferentShop() = runBlocking {
+        val now = System.currentTimeMillis()
+        val otherShopId = UUID.randomUUID().toString()
+        val otherDeviceId = UUID.randomUUID().toString()
+        val otherUserId = UUID.randomUUID().toString()
+
+        // Create second shop, device, user
+        shopDao.insertShop(
+            ShopEntity(
+                shopId = otherShopId,
+                name = "Second Branch",
+                ownerName = "Muhammad Aslam",
+                phone = "03001112233",
+                address = "Islamabad",
+                currency = "PKR",
+                timezone = "Asia/Karachi",
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+        deviceDao.insertDevice(
+            DeviceEntity(
+                deviceId = otherDeviceId,
+                shopId = otherShopId,
+                deviceName = "Counter 2 Terminal",
+                deviceType = DeviceType.PHONE,
+                isPrimary = true,
+                status = DeviceStatus.ACTIVE,
+                createdAt = now,
+                lastSeenAt = now
+            )
+        )
+        userDao.insertUser(
+            UserEntity(
+                userId = otherUserId,
+                shopId = otherShopId,
+                roleId = testRoleId,
+                username = "cashier2",
+                passwordHash = "hash456",
+                fullName = "Usman Khan",
+                phone = "03004445566",
+                pin = "5678",
+                isActive = true,
+                createdAt = now,
+                updatedAt = now
+            )
+        )
+
+        // Insert sale with INV-000100 in testShopId
+        val sale1 = SaleEntity(
+            saleId = UUID.randomUUID().toString(),
+            shopId = testShopId,
+            deviceId = testDeviceId,
+            invoiceNumber = "INV-000100",
+            cashierId = testUserId,
+            customerId = null,
+            subtotal = Money.fromRupees(100),
+            itemDiscount = Money.ZERO,
+            saleDiscount = Money.ZERO,
+            tax = Money.ZERO,
+            grandTotal = Money.fromRupees(100),
+            paidAmount = Money.fromRupees(100),
+            dueAmount = Money.ZERO,
+            status = SaleStatus.COMPLETED,
+            paymentStatus = PaymentStatus.PAID,
+            notes = "",
+            createdAt = now,
+            completedAt = now,
+            updatedAt = now
+        )
+        saleDao.insertSale(sale1)
+
+        // Insert sale with same INV-000100 in otherShopId
+        val sale2 = SaleEntity(
+            saleId = UUID.randomUUID().toString(),
+            shopId = otherShopId,
+            deviceId = otherDeviceId,
+            invoiceNumber = "INV-000100",
+            cashierId = otherUserId,
+            customerId = null,
+            subtotal = Money.fromRupees(200),
+            itemDiscount = Money.ZERO,
+            saleDiscount = Money.ZERO,
+            tax = Money.ZERO,
+            grandTotal = Money.fromRupees(200),
+            paidAmount = Money.fromRupees(200),
+            dueAmount = Money.ZERO,
+            status = SaleStatus.COMPLETED,
+            paymentStatus = PaymentStatus.PAID,
+            notes = "",
+            createdAt = now,
+            completedAt = now,
+            updatedAt = now
+        )
+        saleDao.insertSale(sale2)
+
+        val retrieved1 = saleDao.getSaleById(sale1.saleId)
+        val retrieved2 = saleDao.getSaleById(sale2.saleId)
+        assertNotNull(retrieved1)
+        assertNotNull(retrieved2)
+        assertEquals("INV-000100", retrieved1?.invoiceNumber)
+        assertEquals("INV-000100", retrieved2?.invoiceNumber)
+        assertEquals(testShopId, retrieved1?.shopId)
+        assertEquals(otherShopId, retrieved2?.shopId)
+    }
+
+    @Test
+    fun testMultipleNullInvoiceNumbersAllowedForDraftSales() = runBlocking {
+        val now = System.currentTimeMillis()
+
+        val draftSale1 = SaleEntity(
+            saleId = UUID.randomUUID().toString(),
+            shopId = testShopId,
+            deviceId = testDeviceId,
+            invoiceNumber = null,
+            cashierId = testUserId,
+            customerId = null,
+            subtotal = Money.fromRupees(100),
+            itemDiscount = Money.ZERO,
+            saleDiscount = Money.ZERO,
+            tax = Money.ZERO,
+            grandTotal = Money.fromRupees(100),
+            paidAmount = Money.ZERO,
+            dueAmount = Money.fromRupees(100),
+            status = SaleStatus.DRAFT,
+            paymentStatus = PaymentStatus.UNPAID,
+            notes = "Draft 1",
+            createdAt = now,
+            completedAt = null,
+            updatedAt = now
+        )
+        saleDao.insertSale(draftSale1)
+
+        val draftSale2 = SaleEntity(
+            saleId = UUID.randomUUID().toString(),
+            shopId = testShopId,
+            deviceId = testDeviceId,
+            invoiceNumber = null,
+            cashierId = testUserId,
+            customerId = null,
+            subtotal = Money.fromRupees(200),
+            itemDiscount = Money.ZERO,
+            saleDiscount = Money.ZERO,
+            tax = Money.ZERO,
+            grandTotal = Money.fromRupees(200),
+            paidAmount = Money.ZERO,
+            dueAmount = Money.fromRupees(200),
+            status = SaleStatus.DRAFT,
+            paymentStatus = PaymentStatus.UNPAID,
+            notes = "Draft 2",
+            createdAt = now + 1,
+            completedAt = null,
+            updatedAt = now + 1
+        )
+        saleDao.insertSale(draftSale2)
+
+        val draftSale3 = SaleEntity(
+            saleId = UUID.randomUUID().toString(),
+            shopId = testShopId,
+            deviceId = testDeviceId,
+            invoiceNumber = null,
+            cashierId = testUserId,
+            customerId = null,
+            subtotal = Money.fromRupees(300),
+            itemDiscount = Money.ZERO,
+            saleDiscount = Money.ZERO,
+            tax = Money.ZERO,
+            grandTotal = Money.fromRupees(300),
+            paidAmount = Money.ZERO,
+            dueAmount = Money.fromRupees(300),
+            status = SaleStatus.DRAFT,
+            paymentStatus = PaymentStatus.UNPAID,
+            notes = "Draft 3",
+            createdAt = now + 2,
+            completedAt = null,
+            updatedAt = now + 2
+        )
+        saleDao.insertSale(draftSale3)
+
+        val r1 = saleDao.getSaleById(draftSale1.saleId)
+        val r2 = saleDao.getSaleById(draftSale2.saleId)
+        val r3 = saleDao.getSaleById(draftSale3.saleId)
+
+        assertNotNull(r1)
+        assertNotNull(r2)
+        assertNotNull(r3)
+        assertNull(r1?.invoiceNumber)
+        assertNull(r2?.invoiceNumber)
+        assertNull(r3?.invoiceNumber)
+    }
+
+    @Test
+    fun testSaleStatusIncludesHeldAndPartiallyReturned() = runBlocking {
+        val now = System.currentTimeMillis()
+
+        val heldSale = SaleEntity(
+            saleId = UUID.randomUUID().toString(),
+            shopId = testShopId,
+            deviceId = testDeviceId,
+            invoiceNumber = "INV-HELD-001",
+            cashierId = testUserId,
+            customerId = testCustomerId,
+            subtotal = Money.fromRupees(400),
+            itemDiscount = Money.ZERO,
+            saleDiscount = Money.ZERO,
+            tax = Money.ZERO,
+            grandTotal = Money.fromRupees(400),
+            paidAmount = Money.ZERO,
+            dueAmount = Money.fromRupees(400),
+            status = SaleStatus.HELD,
+            paymentStatus = PaymentStatus.UNPAID,
+            notes = "Held sale for customer phone call",
+            createdAt = now,
+            completedAt = null,
+            updatedAt = now
+        )
+        saleDao.insertSale(heldSale)
+
+        val partiallyReturnedSale = SaleEntity(
+            saleId = UUID.randomUUID().toString(),
+            shopId = testShopId,
+            deviceId = testDeviceId,
+            invoiceNumber = "INV-RET-001",
+            cashierId = testUserId,
+            customerId = testCustomerId,
+            subtotal = Money.fromRupees(800),
+            itemDiscount = Money.ZERO,
+            saleDiscount = Money.ZERO,
+            tax = Money.ZERO,
+            grandTotal = Money.fromRupees(800),
+            paidAmount = Money.fromRupees(800),
+            dueAmount = Money.ZERO,
+            status = SaleStatus.PARTIALLY_RETURNED,
+            paymentStatus = PaymentStatus.PAID,
+            notes = "1 item returned out of 3",
+            createdAt = now,
+            completedAt = now,
+            updatedAt = now
+        )
+        saleDao.insertSale(partiallyReturnedSale)
+
+        val retrievedHeld = saleDao.getSaleById(heldSale.saleId)
+        val retrievedPartial = saleDao.getSaleById(partiallyReturnedSale.saleId)
+
+        assertEquals(SaleStatus.HELD, retrievedHeld?.status)
+        assertEquals(SaleStatus.PARTIALLY_RETURNED, retrievedPartial?.status)
+    }
+
+    @Test
+    fun testConcurrentInvoiceAllocationProducesUniqueNumbers() = runBlocking {
+        val concurrentShopId = UUID.randomUUID().toString()
+        val allocationCount = 25
+
+        val results = coroutineScope {
+            (1..allocationCount).map {
+                async(Dispatchers.Default) {
+                    invoiceSequenceDao.allocateNextInvoiceNumber(concurrentShopId, "TX-", paddingDigits = 5)
+                }
+            }.awaitAll()
+        }
+
+        assertEquals(allocationCount, results.size)
+        // All allocated numbers must be unique
+        val uniqueResults = results.toSet()
+        assertEquals(allocationCount, uniqueResults.size)
+
+        // Verify the sequence stored in DB is at allocationCount + 1
+        val seq = invoiceSequenceDao.getSequence(concurrentShopId)
+        assertNotNull(seq)
+        assertEquals((allocationCount + 1).toLong(), seq?.nextNumber)
     }
 }

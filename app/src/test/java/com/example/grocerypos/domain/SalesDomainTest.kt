@@ -133,4 +133,18 @@ class SalesDomainTest {
         assertEquals(2, sale.items.size)
         assertEquals(2, sale.payments.size)
     }
+
+    @Test
+    fun testSaleStatusEnumValues() {
+        val statuses = SaleStatus.values().map { it.name }.toSet()
+        val expectedStatuses = setOf(
+            "DRAFT",
+            "HELD",
+            "COMPLETED",
+            "VOIDED",
+            "PARTIALLY_RETURNED",
+            "RETURNED"
+        )
+        assertEquals(expectedStatuses, statuses)
+    }
 }

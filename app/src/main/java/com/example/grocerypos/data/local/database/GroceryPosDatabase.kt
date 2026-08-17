@@ -371,7 +371,7 @@ abstract class GroceryPosDatabase : RoomDatabase() {
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_customer_id` ON `sales` (`customer_id`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_status` ON `sales` (`status`)")
                 db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_created_at` ON `sales` (`created_at`)")
-                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_shop_id_invoice_number` ON `sales` (`shop_id`, `invoice_number`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_sales_shop_id_invoice_number` ON `sales` (`shop_id`, `invoice_number`)")
 
                 // 2. Create sale_items table
                 db.execSQL("""

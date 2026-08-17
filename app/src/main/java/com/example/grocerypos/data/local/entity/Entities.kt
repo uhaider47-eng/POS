@@ -624,7 +624,7 @@ data class SupplierEntity(
         Index(value = ["customer_id"]),
         Index(value = ["status"]),
         Index(value = ["created_at"]),
-        Index(value = ["shop_id", "invoice_number"])
+        Index(value = ["shop_id", "invoice_number"], unique = true)
     ]
 )
 data class SaleEntity(

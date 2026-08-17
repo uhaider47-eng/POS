@@ -195,6 +195,7 @@ data class Supplier(
 
 enum class SaleStatus {
     DRAFT,
+    HELD,
     COMPLETED,
     VOIDED,
     PARTIALLY_RETURNED,

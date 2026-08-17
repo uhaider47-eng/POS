@@ -4,8 +4,11 @@ import com.example.grocerypos.domain.model.Barcode
 import com.example.grocerypos.domain.model.Category
 import com.example.grocerypos.domain.model.Device
 import com.example.grocerypos.domain.model.DeviceStatus
+import com.example.grocerypos.domain.model.InvoiceSequence
 import com.example.grocerypos.domain.model.PriceHistory
 import com.example.grocerypos.domain.model.Product
+import com.example.grocerypos.domain.model.Sale
+import com.example.grocerypos.domain.model.SaleStatus
 import com.example.grocerypos.domain.model.Shop
 import com.example.grocerypos.domain.model.StockBalance
 import com.example.grocerypos.domain.model.Unit
@@ -53,4 +56,17 @@ interface ProductRepository {
     fun getStockBalanceFlow(productId: String): Flow<StockBalance?>
     fun getTotalProductCountFlow(shopId: String): Flow<Int>
     fun getActiveProductCountFlow(shopId: String): Flow<Int>
+}
+
+interface InvoiceSequenceRepository {
+    suspend fun allocateNextInvoiceNumber(shopId: String, defaultPrefix: String = "INV-"): Result<String>
+    suspend fun getSequence(shopId: String): InvoiceSequence?
+    suspend fun initializeSequence(shopId: String, startNumber: Long = 1L, prefix: String = "INV-"): Result<Unit>
+}
+
+interface SaleRepository {
+    suspend fun getSaleById(saleId: String): Sale?
+    fun getSalesFlow(shopId: String): Flow<List<Sale>>
+    fun getSalesByStatusFlow(shopId: String, status: SaleStatus = SaleStatus.COMPLETED): Flow<List<Sale>>
+    suspend fun findSaleByInvoiceNumber(shopId: String, invoiceNumber: String): Sale?
 }
