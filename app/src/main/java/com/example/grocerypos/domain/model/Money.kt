@@ -32,6 +32,27 @@ data class Money(
         return Money(Math.multiplyExact(amountInMinorUnits, factor))
     }
 
+    operator fun times(factor: Int): Money = times(factor.toLong())
+
+    /**
+     * Multiplies this monetary amount by a fixed-point [Quantity] (scale 3 = 1000)
+     * using deterministic fixed-point half-up integer rounding:
+     *   (amountInMinorUnits * quantity.amountInScaledUnits + 500) / 1000
+     */
+    fun multiply(quantity: Quantity): Money {
+        if (isZero() || quantity.isZero()) return ZERO
+        val numerator = Math.multiplyExact(amountInMinorUnits, quantity.amountInScaledUnits)
+        val denominator = Quantity.SCALE_FACTOR // 1000L
+        val roundedMinor = if (numerator >= 0L) {
+            (numerator + denominator / 2L) / denominator
+        } else {
+            (numerator - denominator / 2L) / denominator
+        }
+        return Money(roundedMinor)
+    }
+
+    operator fun times(quantity: Quantity): Money = multiply(quantity)
+
     operator fun unaryMinus(): Money {
         return Money(-amountInMinorUnits)
     }
@@ -45,6 +66,8 @@ data class Money(
     fun isNegative(): Boolean = amountInMinorUnits < 0L
 
     fun abs(): Money = Money(kotlin.math.abs(amountInMinorUnits))
+
+    fun toFormattedString(): String = toPlainDecimalString()
 
     /**
      * Converts to human-readable PKR display format.

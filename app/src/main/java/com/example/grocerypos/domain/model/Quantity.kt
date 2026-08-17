@@ -33,6 +33,27 @@ data class Quantity(
         return Quantity(Math.multiplyExact(amountInScaledUnits, scalar))
     }
 
+    operator fun times(scalar: Int): Quantity = times(scalar.toLong())
+
+    /**
+     * Multiplies this quantity by another fixed-point [Quantity] (scale 3 = 1000)
+     * using deterministic fixed-point half-up integer rounding:
+     *   (amountInScaledUnits * other.amountInScaledUnits + 500) / 1000
+     */
+    fun multiply(other: Quantity): Quantity {
+        if (isZero() || other.isZero()) return ZERO
+        val numerator = Math.multiplyExact(amountInScaledUnits, other.amountInScaledUnits)
+        val denominator = SCALE_FACTOR // 1000L
+        val roundedScaled = if (numerator >= 0L) {
+            (numerator + denominator / 2L) / denominator
+        } else {
+            (numerator - denominator / 2L) / denominator
+        }
+        return Quantity(roundedScaled)
+    }
+
+    operator fun times(other: Quantity): Quantity = multiply(other)
+
     /**
      * Divides this quantity by a non-zero scalar [divisor] using deterministic
      * fixed-point HALF_UP integer rounding (symmetric rounding away from zero at 0.5):

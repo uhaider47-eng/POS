@@ -242,6 +242,9 @@ interface CustomerDao {
 
     @Query("SELECT * FROM customers WHERE shop_id = :shopId AND is_active = 1 ORDER BY name ASC")
     fun getActiveCustomersFlow(shopId: String): Flow<List<CustomerEntity>>
+
+    @Query("SELECT * FROM customers WHERE customer_id = :customerId")
+    suspend fun getCustomerById(customerId: String): CustomerEntity?
 }
 
 @Dao
@@ -274,6 +277,9 @@ data class SaleWithItemsAndPayments(
 interface SaleDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertSale(sale: SaleEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSale(sale: SaleEntity)
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertSales(sales: List<SaleEntity>)
@@ -315,6 +321,9 @@ interface SaleItemDao {
 
     @Query("SELECT * FROM sale_items WHERE sale_id = :saleId")
     fun getItemsForSaleFlow(saleId: String): Flow<List<SaleItemEntity>>
+
+    @Query("DELETE FROM sale_items WHERE sale_id = :saleId")
+    suspend fun deleteItemsForSale(saleId: String)
 }
 
 @Dao
@@ -333,6 +342,9 @@ interface PaymentDao {
 
     @Query("SELECT * FROM payments WHERE shop_id = :shopId ORDER BY received_at DESC")
     fun getPaymentsForShopFlow(shopId: String): Flow<List<PaymentEntity>>
+
+    @Query("DELETE FROM payments WHERE sale_id = :saleId")
+    suspend fun deletePaymentsForSale(saleId: String)
 }
 
 @Dao
