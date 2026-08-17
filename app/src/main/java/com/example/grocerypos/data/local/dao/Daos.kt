@@ -1,24 +1,36 @@
 package com.example.grocerypos.data.local.dao
 
 import androidx.room.Dao
+import androidx.room.Embedded
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.Relation
 import androidx.room.Transaction
 import androidx.room.Update
+import com.example.grocerypos.data.local.entity.AuditLogEntity
 import com.example.grocerypos.data.local.entity.BarcodeEntity
+import com.example.grocerypos.data.local.entity.CashMovementEntity
 import com.example.grocerypos.data.local.entity.CategoryEntity
 import com.example.grocerypos.data.local.entity.CustomerEntity
+import com.example.grocerypos.data.local.entity.CustomerLedgerEntryEntity
 import com.example.grocerypos.data.local.entity.DeviceEntity
+import com.example.grocerypos.data.local.entity.InvoiceSequenceEntity
+import com.example.grocerypos.data.local.entity.PaymentEntity
 import com.example.grocerypos.data.local.entity.PriceHistoryEntity
 import com.example.grocerypos.data.local.entity.ProductEntity
 import com.example.grocerypos.data.local.entity.RoleEntity
+import com.example.grocerypos.data.local.entity.SaleEntity
+import com.example.grocerypos.data.local.entity.SaleItemEntity
 import com.example.grocerypos.data.local.entity.ShopEntity
 import com.example.grocerypos.data.local.entity.StockBalanceEntity
 import com.example.grocerypos.data.local.entity.StockMovementEntity
 import com.example.grocerypos.data.local.entity.SupplierEntity
+import com.example.grocerypos.data.local.entity.SyncEventEntity
 import com.example.grocerypos.data.local.entity.UnitEntity
 import com.example.grocerypos.data.local.entity.UserEntity
+import com.example.grocerypos.domain.model.SaleStatus
+import com.example.grocerypos.domain.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -242,4 +254,155 @@ interface SupplierDao {
 
     @Query("SELECT * FROM suppliers WHERE shop_id = :shopId AND is_active = 1 ORDER BY name ASC")
     fun getActiveSuppliersFlow(shopId: String): Flow<List<SupplierEntity>>
+}
+
+data class SaleWithItemsAndPayments(
+    @Embedded val sale: SaleEntity,
+    @Relation(
+        parentColumn = "sale_id",
+        entityColumn = "sale_id"
+    )
+    val items: List<SaleItemEntity>,
+    @Relation(
+        parentColumn = "sale_id",
+        entityColumn = "sale_id"
+    )
+    val payments: List<PaymentEntity>
+)
+
+@Dao
+interface SaleDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertSale(sale: SaleEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertSales(sales: List<SaleEntity>)
+
+    @Update
+    suspend fun updateSale(sale: SaleEntity)
+
+    @Query("SELECT * FROM sales WHERE sale_id = :saleId")
+    suspend fun getSaleById(saleId: String): SaleEntity?
+
+    @Transaction
+    @Query("SELECT * FROM sales WHERE sale_id = :saleId")
+    suspend fun getSaleWithDetails(saleId: String): SaleWithItemsAndPayments?
+
+    @Transaction
+    @Query("SELECT * FROM sales WHERE sale_id = :saleId")
+    fun getSaleWithDetailsFlow(saleId: String): Flow<SaleWithItemsAndPayments?>
+
+    @Query("SELECT * FROM sales WHERE shop_id = :shopId ORDER BY created_at DESC")
+    fun getSalesForShopFlow(shopId: String): Flow<List<SaleEntity>>
+
+    @Query("SELECT * FROM sales WHERE shop_id = :shopId AND status = :status ORDER BY created_at DESC")
+    fun getSalesByStatusFlow(shopId: String, status: SaleStatus = SaleStatus.COMPLETED): Flow<List<SaleEntity>>
+
+    @Query("SELECT * FROM sales WHERE shop_id = :shopId AND invoice_number = :invoiceNumber LIMIT 1")
+    suspend fun findSaleByInvoiceNumber(shopId: String, invoiceNumber: String): SaleEntity?
+}
+
+@Dao
+interface SaleItemDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertSaleItem(item: SaleItemEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertSaleItems(items: List<SaleItemEntity>)
+
+    @Query("SELECT * FROM sale_items WHERE sale_id = :saleId")
+    suspend fun getItemsForSale(saleId: String): List<SaleItemEntity>
+
+    @Query("SELECT * FROM sale_items WHERE sale_id = :saleId")
+    fun getItemsForSaleFlow(saleId: String): Flow<List<SaleItemEntity>>
+}
+
+@Dao
+interface PaymentDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertPayment(payment: PaymentEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertPayments(payments: List<PaymentEntity>)
+
+    @Query("SELECT * FROM payments WHERE sale_id = :saleId ORDER BY received_at ASC")
+    suspend fun getPaymentsForSale(saleId: String): List<PaymentEntity>
+
+    @Query("SELECT * FROM payments WHERE sale_id = :saleId ORDER BY received_at ASC")
+    fun getPaymentsForSaleFlow(saleId: String): Flow<List<PaymentEntity>>
+
+    @Query("SELECT * FROM payments WHERE shop_id = :shopId ORDER BY received_at DESC")
+    fun getPaymentsForShopFlow(shopId: String): Flow<List<PaymentEntity>>
+}
+
+@Dao
+interface CustomerLedgerDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertLedgerEntry(entry: CustomerLedgerEntryEntity)
+
+    @Query("SELECT * FROM customer_ledger_entries WHERE customer_id = :customerId ORDER BY created_at ASC")
+    suspend fun getEntriesForCustomer(customerId: String): List<CustomerLedgerEntryEntity>
+
+    @Query("SELECT * FROM customer_ledger_entries WHERE customer_id = :customerId ORDER BY created_at ASC")
+    fun getEntriesForCustomerFlow(customerId: String): Flow<List<CustomerLedgerEntryEntity>>
+
+    @Query("SELECT * FROM customer_ledger_entries WHERE shop_id = :shopId ORDER BY created_at DESC")
+    fun getEntriesForShopFlow(shopId: String): Flow<List<CustomerLedgerEntryEntity>>
+}
+
+@Dao
+interface CashMovementDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertCashMovement(movement: CashMovementEntity)
+
+    @Query("SELECT * FROM cash_movements WHERE shop_id = :shopId ORDER BY created_at DESC")
+    fun getMovementsForShopFlow(shopId: String): Flow<List<CashMovementEntity>>
+
+    @Query("SELECT * FROM cash_movements WHERE device_id = :deviceId ORDER BY created_at DESC")
+    fun getMovementsForDeviceFlow(deviceId: String): Flow<List<CashMovementEntity>>
+}
+
+@Dao
+interface AuditLogDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAuditLog(log: AuditLogEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertAuditLogs(logs: List<AuditLogEntity>)
+
+    @Query("SELECT * FROM audit_logs WHERE shop_id = :shopId ORDER BY timestamp DESC")
+    fun getLogsForShopFlow(shopId: String): Flow<List<AuditLogEntity>>
+
+    @Query("SELECT * FROM audit_logs WHERE entity_type = :entityType AND entity_id = :entityId ORDER BY timestamp DESC")
+    fun getLogsForEntityFlow(entityType: String, entityId: String): Flow<List<AuditLogEntity>>
+}
+
+@Dao
+interface SyncEventDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertSyncEvent(event: SyncEventEntity)
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertSyncEvents(events: List<SyncEventEntity>)
+
+    @Query("SELECT * FROM sync_events WHERE shop_id = :shopId AND sync_status = 'PENDING' ORDER BY timestamp ASC")
+    suspend fun getPendingSyncEvents(shopId: String): List<SyncEventEntity>
+
+    @Query("SELECT * FROM sync_events WHERE shop_id = :shopId AND sync_status = 'PENDING' ORDER BY timestamp ASC")
+    fun getPendingSyncEventsFlow(shopId: String): Flow<List<SyncEventEntity>>
+
+    @Query("UPDATE sync_events SET sync_status = :status WHERE event_id = :eventId")
+    suspend fun updateSyncStatus(eventId: String, status: SyncStatus)
+}
+
+@Dao
+interface InvoiceSequenceDao {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertSequence(sequence: InvoiceSequenceEntity)
+
+    @Query("SELECT * FROM invoice_sequences WHERE shop_id = :shopId LIMIT 1")
+    suspend fun getSequence(shopId: String): InvoiceSequenceEntity?
+
+    @Query("UPDATE invoice_sequences SET next_number = next_number + 1, updated_at = :updatedAt WHERE shop_id = :shopId")
+    suspend fun incrementNextNumber(shopId: String, updatedAt: Long)
 }

@@ -5,12 +5,20 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.example.grocerypos.domain.model.AuditAction
+import com.example.grocerypos.domain.model.CashMovementType
+import com.example.grocerypos.domain.model.CustomerLedgerType
 import com.example.grocerypos.domain.model.DeviceStatus
 import com.example.grocerypos.domain.model.DeviceType
 import com.example.grocerypos.domain.model.Money
 import com.example.grocerypos.domain.model.MovementType
+import com.example.grocerypos.domain.model.PaymentMethod
+import com.example.grocerypos.domain.model.PaymentStatus
 import com.example.grocerypos.domain.model.Quantity
 import com.example.grocerypos.domain.model.RoleName
+import com.example.grocerypos.domain.model.SaleStatus
+import com.example.grocerypos.domain.model.SyncOperation
+import com.example.grocerypos.domain.model.SyncStatus
 import com.example.grocerypos.domain.model.UnitCode
 
 @Entity(
@@ -575,6 +583,487 @@ data class SupplierEntity(
 
     @ColumnInfo(name = "created_at")
     val createdAt: Long,
+
+    @ColumnInfo(name = "updated_at")
+    val updatedAt: Long
+)
+
+@Entity(
+    tableName = "sales",
+    foreignKeys = [
+        ForeignKey(
+            entity = ShopEntity::class,
+            parentColumns = ["shop_id"],
+            childColumns = ["shop_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = DeviceEntity::class,
+            parentColumns = ["device_id"],
+            childColumns = ["device_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = UserEntity::class,
+            parentColumns = ["user_id"],
+            childColumns = ["cashier_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = CustomerEntity::class,
+            parentColumns = ["customer_id"],
+            childColumns = ["customer_id"],
+            onDelete = ForeignKey.RESTRICT
+        )
+    ],
+    indices = [
+        Index(value = ["shop_id"]),
+        Index(value = ["device_id"]),
+        Index(value = ["invoice_number"]),
+        Index(value = ["cashier_id"]),
+        Index(value = ["customer_id"]),
+        Index(value = ["status"]),
+        Index(value = ["created_at"]),
+        Index(value = ["shop_id", "invoice_number"])
+    ]
+)
+data class SaleEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "sale_id")
+    val saleId: String,
+
+    @ColumnInfo(name = "shop_id")
+    val shopId: String,
+
+    @ColumnInfo(name = "device_id")
+    val deviceId: String,
+
+    @ColumnInfo(name = "invoice_number")
+    val invoiceNumber: String? = null,
+
+    @ColumnInfo(name = "cashier_id")
+    val cashierId: String,
+
+    @ColumnInfo(name = "customer_id")
+    val customerId: String? = null,
+
+    @ColumnInfo(name = "subtotal")
+    val subtotal: Money,
+
+    @ColumnInfo(name = "item_discount")
+    val itemDiscount: Money = Money.ZERO,
+
+    @ColumnInfo(name = "sale_discount")
+    val saleDiscount: Money = Money.ZERO,
+
+    @ColumnInfo(name = "tax")
+    val tax: Money = Money.ZERO,
+
+    @ColumnInfo(name = "grand_total")
+    val grandTotal: Money,
+
+    @ColumnInfo(name = "paid_amount")
+    val paidAmount: Money = Money.ZERO,
+
+    @ColumnInfo(name = "due_amount")
+    val dueAmount: Money = Money.ZERO,
+
+    @ColumnInfo(name = "status")
+    val status: SaleStatus = SaleStatus.DRAFT,
+
+    @ColumnInfo(name = "payment_status")
+    val paymentStatus: PaymentStatus = PaymentStatus.UNPAID,
+
+    @ColumnInfo(name = "notes")
+    val notes: String = "",
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long,
+
+    @ColumnInfo(name = "completed_at")
+    val completedAt: Long? = null,
+
+    @ColumnInfo(name = "updated_at")
+    val updatedAt: Long
+)
+
+@Entity(
+    tableName = "sale_items",
+    foreignKeys = [
+        ForeignKey(
+            entity = SaleEntity::class,
+            parentColumns = ["sale_id"],
+            childColumns = ["sale_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = ProductEntity::class,
+            parentColumns = ["product_id"],
+            childColumns = ["product_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = UnitEntity::class,
+            parentColumns = ["unit_id"],
+            childColumns = ["sold_unit_id"],
+            onDelete = ForeignKey.RESTRICT
+        )
+    ],
+    indices = [
+        Index(value = ["sale_id"]),
+        Index(value = ["product_id"]),
+        Index(value = ["sold_unit_id"])
+    ]
+)
+data class SaleItemEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "sale_item_id")
+    val saleItemId: String,
+
+    @ColumnInfo(name = "sale_id")
+    val saleId: String,
+
+    @ColumnInfo(name = "product_id")
+    val productId: String,
+
+    @ColumnInfo(name = "product_name")
+    val productName: String,
+
+    @ColumnInfo(name = "sold_unit_id")
+    val soldUnitId: String,
+
+    @ColumnInfo(name = "quantity")
+    val quantity: Quantity,
+
+    @ColumnInfo(name = "unit_price")
+    val unitPrice: Money,
+
+    @ColumnInfo(name = "gross_amount")
+    val grossAmount: Money,
+
+    @ColumnInfo(name = "discount")
+    val discount: Money = Money.ZERO,
+
+    @ColumnInfo(name = "tax")
+    val tax: Money = Money.ZERO,
+
+    @ColumnInfo(name = "net_amount")
+    val netAmount: Money,
+
+    @ColumnInfo(name = "cost_at_sale")
+    val costAtSale: Money = Money.ZERO,
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long
+)
+
+@Entity(
+    tableName = "payments",
+    foreignKeys = [
+        ForeignKey(
+            entity = SaleEntity::class,
+            parentColumns = ["sale_id"],
+            childColumns = ["sale_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = ShopEntity::class,
+            parentColumns = ["shop_id"],
+            childColumns = ["shop_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = UserEntity::class,
+            parentColumns = ["user_id"],
+            childColumns = ["received_by"],
+            onDelete = ForeignKey.RESTRICT
+        )
+    ],
+    indices = [
+        Index(value = ["sale_id"]),
+        Index(value = ["shop_id"]),
+        Index(value = ["received_at"]),
+        Index(value = ["received_by"])
+    ]
+)
+data class PaymentEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "payment_id")
+    val paymentId: String,
+
+    @ColumnInfo(name = "sale_id")
+    val saleId: String,
+
+    @ColumnInfo(name = "shop_id")
+    val shopId: String,
+
+    @ColumnInfo(name = "method")
+    val method: PaymentMethod,
+
+    @ColumnInfo(name = "amount")
+    val amount: Money,
+
+    @ColumnInfo(name = "reference_number")
+    val referenceNumber: String? = null,
+
+    @ColumnInfo(name = "received_at")
+    val receivedAt: Long,
+
+    @ColumnInfo(name = "received_by")
+    val receivedBy: String
+)
+
+@Entity(
+    tableName = "customer_ledger_entries",
+    foreignKeys = [
+        ForeignKey(
+            entity = CustomerEntity::class,
+            parentColumns = ["customer_id"],
+            childColumns = ["customer_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = ShopEntity::class,
+            parentColumns = ["shop_id"],
+            childColumns = ["shop_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = UserEntity::class,
+            parentColumns = ["user_id"],
+            childColumns = ["created_by"],
+            onDelete = ForeignKey.RESTRICT
+        )
+    ],
+    indices = [
+        Index(value = ["customer_id"]),
+        Index(value = ["shop_id"]),
+        Index(value = ["created_at"]),
+        Index(value = ["reference_id"]),
+        Index(value = ["created_by"])
+    ]
+)
+data class CustomerLedgerEntryEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "entry_id")
+    val entryId: String,
+
+    @ColumnInfo(name = "customer_id")
+    val customerId: String,
+
+    @ColumnInfo(name = "shop_id")
+    val shopId: String,
+
+    @ColumnInfo(name = "type")
+    val type: CustomerLedgerType,
+
+    @ColumnInfo(name = "amount")
+    val amount: Money,
+
+    @ColumnInfo(name = "reference_type")
+    val referenceType: String? = null,
+
+    @ColumnInfo(name = "reference_id")
+    val referenceId: String? = null,
+
+    @ColumnInfo(name = "notes")
+    val notes: String = "",
+
+    @ColumnInfo(name = "created_by")
+    val createdBy: String,
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long
+)
+
+@Entity(
+    tableName = "cash_movements",
+    foreignKeys = [
+        ForeignKey(
+            entity = ShopEntity::class,
+            parentColumns = ["shop_id"],
+            childColumns = ["shop_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = DeviceEntity::class,
+            parentColumns = ["device_id"],
+            childColumns = ["device_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = UserEntity::class,
+            parentColumns = ["user_id"],
+            childColumns = ["created_by"],
+            onDelete = ForeignKey.RESTRICT
+        )
+    ],
+    indices = [
+        Index(value = ["shop_id"]),
+        Index(value = ["device_id"]),
+        Index(value = ["created_at"]),
+        Index(value = ["reference_id"]),
+        Index(value = ["created_by"])
+    ]
+)
+data class CashMovementEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "movement_id")
+    val movementId: String,
+
+    @ColumnInfo(name = "shop_id")
+    val shopId: String,
+
+    @ColumnInfo(name = "device_id")
+    val deviceId: String,
+
+    @ColumnInfo(name = "type")
+    val type: CashMovementType,
+
+    @ColumnInfo(name = "amount")
+    val amount: Money,
+
+    @ColumnInfo(name = "reference_type")
+    val referenceType: String? = null,
+
+    @ColumnInfo(name = "reference_id")
+    val referenceId: String? = null,
+
+    @ColumnInfo(name = "notes")
+    val notes: String = "",
+
+    @ColumnInfo(name = "created_by")
+    val createdBy: String,
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long
+)
+
+@Entity(
+    tableName = "audit_logs",
+    foreignKeys = [
+        ForeignKey(
+            entity = ShopEntity::class,
+            parentColumns = ["shop_id"],
+            childColumns = ["shop_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = UserEntity::class,
+            parentColumns = ["user_id"],
+            childColumns = ["user_id"],
+            onDelete = ForeignKey.RESTRICT
+        )
+    ],
+    indices = [
+        Index(value = ["shop_id"]),
+        Index(value = ["user_id"]),
+        Index(value = ["entity_type", "entity_id"]),
+        Index(value = ["timestamp"])
+    ]
+)
+data class AuditLogEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "log_id")
+    val logId: String,
+
+    @ColumnInfo(name = "shop_id")
+    val shopId: String,
+
+    @ColumnInfo(name = "user_id")
+    val userId: String,
+
+    @ColumnInfo(name = "action")
+    val action: AuditAction,
+
+    @ColumnInfo(name = "entity_type")
+    val entityType: String,
+
+    @ColumnInfo(name = "entity_id")
+    val entityId: String,
+
+    @ColumnInfo(name = "details")
+    val details: String = "",
+
+    @ColumnInfo(name = "timestamp")
+    val timestamp: Long
+)
+
+@Entity(
+    tableName = "sync_events",
+    foreignKeys = [
+        ForeignKey(
+            entity = ShopEntity::class,
+            parentColumns = ["shop_id"],
+            childColumns = ["shop_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = DeviceEntity::class,
+            parentColumns = ["device_id"],
+            childColumns = ["device_id"],
+            onDelete = ForeignKey.RESTRICT
+        )
+    ],
+    indices = [
+        Index(value = ["shop_id"]),
+        Index(value = ["device_id"]),
+        Index(value = ["sync_status"]),
+        Index(value = ["entity_type", "entity_id"]),
+        Index(value = ["timestamp"])
+    ]
+)
+data class SyncEventEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "event_id")
+    val eventId: String,
+
+    @ColumnInfo(name = "shop_id")
+    val shopId: String,
+
+    @ColumnInfo(name = "device_id")
+    val deviceId: String,
+
+    @ColumnInfo(name = "entity_type")
+    val entityType: String,
+
+    @ColumnInfo(name = "entity_id")
+    val entityId: String,
+
+    @ColumnInfo(name = "operation")
+    val operation: SyncOperation,
+
+    @ColumnInfo(name = "sync_status")
+    val syncStatus: SyncStatus = SyncStatus.PENDING,
+
+    @ColumnInfo(name = "timestamp")
+    val timestamp: Long
+)
+
+@Entity(
+    tableName = "invoice_sequences",
+    foreignKeys = [
+        ForeignKey(
+            entity = ShopEntity::class,
+            parentColumns = ["shop_id"],
+            childColumns = ["shop_id"],
+            onDelete = ForeignKey.RESTRICT
+        )
+    ],
+    indices = [
+        Index(value = ["shop_id"])
+    ]
+)
+data class InvoiceSequenceEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "shop_id")
+    val shopId: String,
+
+    @ColumnInfo(name = "next_number")
+    val nextNumber: Long = 1L,
+
+    @ColumnInfo(name = "prefix")
+    val prefix: String = "INV-",
 
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long

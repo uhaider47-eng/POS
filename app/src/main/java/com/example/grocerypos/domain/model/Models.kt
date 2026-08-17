@@ -192,3 +192,181 @@ data class Supplier(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+enum class SaleStatus {
+    DRAFT,
+    COMPLETED,
+    VOIDED,
+    PARTIALLY_RETURNED,
+    RETURNED
+}
+
+enum class PaymentStatus {
+    UNPAID,
+    PARTIALLY_PAID,
+    PAID
+}
+
+enum class PaymentMethod {
+    CASH,
+    BANK_TRANSFER,
+    CARD,
+    EASYPAISA,
+    JAZZCASH,
+    OTHER
+}
+
+enum class CustomerLedgerType {
+    SALE_CREDIT,
+    PAYMENT,
+    RETURN_CREDIT,
+    ADJUSTMENT,
+    OPENING_BALANCE
+}
+
+enum class CashMovementType {
+    SALE_CASH,
+    CUSTOMER_PAYMENT,
+    REFUND,
+    EXPENSE,
+    CASH_IN,
+    CASH_OUT,
+    OPENING_CASH
+}
+
+enum class AuditAction {
+    SALE_CREATED,
+    SALE_COMPLETED,
+    SALE_VOIDED,
+    PAYMENT_RECORDED,
+    STOCK_ADJUSTED,
+    SETTING_CHANGED,
+    CUSTOMER_CREDIT_RECORDED,
+    CASH_MOVED
+}
+
+enum class SyncOperation {
+    CREATE,
+    UPDATE,
+    DELETE
+}
+
+enum class SyncStatus {
+    PENDING,
+    SYNCED,
+    FAILED
+}
+
+@Serializable
+data class Sale(
+    val saleId: String,
+    val shopId: String,
+    val deviceId: String,
+    val invoiceNumber: String? = null,
+    val cashierId: String,
+    val customerId: String? = null,
+    val subtotal: Money,
+    val itemDiscount: Money = Money.ZERO,
+    val saleDiscount: Money = Money.ZERO,
+    val tax: Money = Money.ZERO,
+    val grandTotal: Money,
+    val paidAmount: Money = Money.ZERO,
+    val dueAmount: Money = Money.ZERO,
+    val status: SaleStatus = SaleStatus.DRAFT,
+    val paymentStatus: PaymentStatus = PaymentStatus.UNPAID,
+    val notes: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+    val completedAt: Long? = null,
+    val updatedAt: Long = System.currentTimeMillis(),
+    val items: List<SaleItem> = emptyList(),
+    val payments: List<Payment> = emptyList()
+)
+
+@Serializable
+data class SaleItem(
+    val saleItemId: String,
+    val saleId: String,
+    val productId: String,
+    val productName: String,
+    val soldUnitId: String,
+    val quantity: Quantity,
+    val unitPrice: Money,
+    val grossAmount: Money,
+    val discount: Money = Money.ZERO,
+    val tax: Money = Money.ZERO,
+    val netAmount: Money,
+    val costAtSale: Money = Money.ZERO,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+data class Payment(
+    val paymentId: String,
+    val saleId: String,
+    val shopId: String,
+    val method: PaymentMethod,
+    val amount: Money,
+    val referenceNumber: String? = null,
+    val receivedAt: Long = System.currentTimeMillis(),
+    val receivedBy: String
+)
+
+@Serializable
+data class CustomerLedgerEntry(
+    val entryId: String,
+    val customerId: String,
+    val shopId: String,
+    val type: CustomerLedgerType,
+    val amount: Money,
+    val referenceType: String? = null,
+    val referenceId: String? = null,
+    val notes: String = "",
+    val createdBy: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+data class CashMovement(
+    val movementId: String,
+    val shopId: String,
+    val deviceId: String,
+    val type: CashMovementType,
+    val amount: Money,
+    val referenceType: String? = null,
+    val referenceId: String? = null,
+    val notes: String = "",
+    val createdBy: String,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Serializable
+data class AuditLog(
+    val logId: String,
+    val shopId: String,
+    val userId: String,
+    val action: AuditAction,
+    val entityType: String,
+    val entityId: String,
+    val details: String = "",
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Serializable
+data class SyncEvent(
+    val eventId: String,
+    val shopId: String,
+    val deviceId: String,
+    val entityType: String,
+    val entityId: String,
+    val operation: SyncOperation,
+    val syncStatus: SyncStatus = SyncStatus.PENDING,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+@Serializable
+data class InvoiceSequence(
+    val shopId: String,
+    val nextNumber: Long = 1L,
+    val prefix: String = "INV-",
+    val updatedAt: Long = System.currentTimeMillis()
+)

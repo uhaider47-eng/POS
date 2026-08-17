@@ -1,17 +1,25 @@
 package com.example.grocerypos.di
 
 import android.content.Context
+import com.example.grocerypos.data.local.dao.AuditLogDao
 import com.example.grocerypos.data.local.dao.BarcodeDao
+import com.example.grocerypos.data.local.dao.CashMovementDao
 import com.example.grocerypos.data.local.dao.CategoryDao
 import com.example.grocerypos.data.local.dao.CustomerDao
+import com.example.grocerypos.data.local.dao.CustomerLedgerDao
 import com.example.grocerypos.data.local.dao.DeviceDao
+import com.example.grocerypos.data.local.dao.InvoiceSequenceDao
+import com.example.grocerypos.data.local.dao.PaymentDao
 import com.example.grocerypos.data.local.dao.PriceHistoryDao
 import com.example.grocerypos.data.local.dao.ProductDao
 import com.example.grocerypos.data.local.dao.RoleDao
+import com.example.grocerypos.data.local.dao.SaleDao
+import com.example.grocerypos.data.local.dao.SaleItemDao
 import com.example.grocerypos.data.local.dao.ShopDao
 import com.example.grocerypos.data.local.dao.StockBalanceDao
 import com.example.grocerypos.data.local.dao.StockMovementDao
 import com.example.grocerypos.data.local.dao.SupplierDao
+import com.example.grocerypos.data.local.dao.SyncEventDao
 import com.example.grocerypos.data.local.dao.UnitDao
 import com.example.grocerypos.data.local.dao.UserDao
 import com.example.grocerypos.data.local.database.GroceryPosDatabase
@@ -88,4 +96,28 @@ object DatabaseModule {
 
     @Provides
     fun provideSupplierDao(db: GroceryPosDatabase): SupplierDao = db.supplierDao()
+
+    @Provides
+    fun provideSaleDao(db: GroceryPosDatabase): SaleDao = db.saleDao()
+
+    @Provides
+    fun provideSaleItemDao(db: GroceryPosDatabase): SaleItemDao = db.saleItemDao()
+
+    @Provides
+    fun providePaymentDao(db: GroceryPosDatabase): PaymentDao = db.paymentDao()
+
+    @Provides
+    fun provideCustomerLedgerDao(db: GroceryPosDatabase): CustomerLedgerDao = db.customerLedgerDao()
+
+    @Provides
+    fun provideCashMovementDao(db: GroceryPosDatabase): CashMovementDao = db.cashMovementDao()
+
+    @Provides
+    fun provideAuditLogDao(db: GroceryPosDatabase): AuditLogDao = db.auditLogDao()
+
+    @Provides
+    fun provideSyncEventDao(db: GroceryPosDatabase): SyncEventDao = db.syncEventDao()
+
+    @Provides
+    fun provideInvoiceSequenceDao(db: GroceryPosDatabase): InvoiceSequenceDao = db.invoiceSequenceDao()
 }

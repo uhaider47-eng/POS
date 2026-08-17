@@ -8,30 +8,46 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.grocerypos.data.local.converter.Converters
+import com.example.grocerypos.data.local.dao.AuditLogDao
 import com.example.grocerypos.data.local.dao.BarcodeDao
+import com.example.grocerypos.data.local.dao.CashMovementDao
 import com.example.grocerypos.data.local.dao.CategoryDao
 import com.example.grocerypos.data.local.dao.CustomerDao
+import com.example.grocerypos.data.local.dao.CustomerLedgerDao
 import com.example.grocerypos.data.local.dao.DeviceDao
+import com.example.grocerypos.data.local.dao.InvoiceSequenceDao
+import com.example.grocerypos.data.local.dao.PaymentDao
 import com.example.grocerypos.data.local.dao.PriceHistoryDao
 import com.example.grocerypos.data.local.dao.ProductDao
 import com.example.grocerypos.data.local.dao.RoleDao
+import com.example.grocerypos.data.local.dao.SaleDao
+import com.example.grocerypos.data.local.dao.SaleItemDao
 import com.example.grocerypos.data.local.dao.ShopDao
 import com.example.grocerypos.data.local.dao.StockBalanceDao
 import com.example.grocerypos.data.local.dao.StockMovementDao
 import com.example.grocerypos.data.local.dao.SupplierDao
+import com.example.grocerypos.data.local.dao.SyncEventDao
 import com.example.grocerypos.data.local.dao.UnitDao
 import com.example.grocerypos.data.local.dao.UserDao
+import com.example.grocerypos.data.local.entity.AuditLogEntity
 import com.example.grocerypos.data.local.entity.BarcodeEntity
+import com.example.grocerypos.data.local.entity.CashMovementEntity
 import com.example.grocerypos.data.local.entity.CategoryEntity
 import com.example.grocerypos.data.local.entity.CustomerEntity
+import com.example.grocerypos.data.local.entity.CustomerLedgerEntryEntity
 import com.example.grocerypos.data.local.entity.DeviceEntity
+import com.example.grocerypos.data.local.entity.InvoiceSequenceEntity
+import com.example.grocerypos.data.local.entity.PaymentEntity
 import com.example.grocerypos.data.local.entity.PriceHistoryEntity
 import com.example.grocerypos.data.local.entity.ProductEntity
 import com.example.grocerypos.data.local.entity.RoleEntity
+import com.example.grocerypos.data.local.entity.SaleEntity
+import com.example.grocerypos.data.local.entity.SaleItemEntity
 import com.example.grocerypos.data.local.entity.ShopEntity
 import com.example.grocerypos.data.local.entity.StockBalanceEntity
 import com.example.grocerypos.data.local.entity.StockMovementEntity
 import com.example.grocerypos.data.local.entity.SupplierEntity
+import com.example.grocerypos.data.local.entity.SyncEventEntity
 import com.example.grocerypos.data.local.entity.UnitEntity
 import com.example.grocerypos.data.local.entity.UserEntity
 import com.example.grocerypos.domain.model.RoleName
@@ -54,9 +70,17 @@ import kotlinx.coroutines.launch
         StockBalanceEntity::class,
         StockMovementEntity::class,
         CustomerEntity::class,
-        SupplierEntity::class
+        SupplierEntity::class,
+        SaleEntity::class,
+        SaleItemEntity::class,
+        PaymentEntity::class,
+        CustomerLedgerEntryEntity::class,
+        CashMovementEntity::class,
+        AuditLogEntity::class,
+        SyncEventEntity::class,
+        InvoiceSequenceEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -75,10 +99,18 @@ abstract class GroceryPosDatabase : RoomDatabase() {
     abstract fun stockMovementDao(): StockMovementDao
     abstract fun customerDao(): CustomerDao
     abstract fun supplierDao(): SupplierDao
+    abstract fun saleDao(): SaleDao
+    abstract fun saleItemDao(): SaleItemDao
+    abstract fun paymentDao(): PaymentDao
+    abstract fun customerLedgerDao(): CustomerLedgerDao
+    abstract fun cashMovementDao(): CashMovementDao
+    abstract fun auditLogDao(): AuditLogDao
+    abstract fun syncEventDao(): SyncEventDao
+    abstract fun invoiceSequenceDao(): InvoiceSequenceDao
 
     companion object {
         const val DATABASE_NAME = "grocery_pos_db"
-        const val DATABASE_VERSION = 3
+        const val DATABASE_VERSION = 4
 
         /**
          * MIGRATION_1_2:
@@ -289,13 +321,214 @@ abstract class GroceryPosDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * MIGRATION_3_4:
+         * Non-destructive migration creating the Sales domain tables:
+         * - sales
+         * - sale_items
+         * - payments
+         * - customer_ledger_entries
+         * - cash_movements
+         * - audit_logs
+         * - sync_events
+         * - invoice_sequences
+         * All existing product, category, stock, user, and customer records remain completely intact.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // 1. Create sales table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `sales` (
+                        `sale_id` TEXT NOT NULL PRIMARY KEY,
+                        `shop_id` TEXT NOT NULL,
+                        `device_id` TEXT NOT NULL,
+                        `invoice_number` TEXT,
+                        `cashier_id` TEXT NOT NULL,
+                        `customer_id` TEXT,
+                        `subtotal` INTEGER NOT NULL,
+                        `item_discount` INTEGER NOT NULL,
+                        `sale_discount` INTEGER NOT NULL,
+                        `tax` INTEGER NOT NULL,
+                        `grand_total` INTEGER NOT NULL,
+                        `paid_amount` INTEGER NOT NULL,
+                        `due_amount` INTEGER NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `payment_status` TEXT NOT NULL,
+                        `notes` TEXT NOT NULL,
+                        `created_at` INTEGER NOT NULL,
+                        `completed_at` INTEGER,
+                        `updated_at` INTEGER NOT NULL,
+                        FOREIGN KEY(`shop_id`) REFERENCES `shops`(`shop_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`device_id`) REFERENCES `devices`(`device_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`cashier_id`) REFERENCES `users`(`user_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`customer_id`) REFERENCES `customers`(`customer_id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_shop_id` ON `sales` (`shop_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_device_id` ON `sales` (`device_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_invoice_number` ON `sales` (`invoice_number`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_cashier_id` ON `sales` (`cashier_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_customer_id` ON `sales` (`customer_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_status` ON `sales` (`status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_created_at` ON `sales` (`created_at`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sales_shop_id_invoice_number` ON `sales` (`shop_id`, `invoice_number`)")
+
+                // 2. Create sale_items table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `sale_items` (
+                        `sale_item_id` TEXT NOT NULL PRIMARY KEY,
+                        `sale_id` TEXT NOT NULL,
+                        `product_id` TEXT NOT NULL,
+                        `product_name` TEXT NOT NULL,
+                        `sold_unit_id` TEXT NOT NULL,
+                        `quantity` INTEGER NOT NULL,
+                        `unit_price` INTEGER NOT NULL,
+                        `gross_amount` INTEGER NOT NULL,
+                        `discount` INTEGER NOT NULL,
+                        `tax` INTEGER NOT NULL,
+                        `net_amount` INTEGER NOT NULL,
+                        `cost_at_sale` INTEGER NOT NULL,
+                        `created_at` INTEGER NOT NULL,
+                        FOREIGN KEY(`sale_id`) REFERENCES `sales`(`sale_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`product_id`) REFERENCES `products`(`product_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`sold_unit_id`) REFERENCES `units`(`unit_id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sale_items_sale_id` ON `sale_items` (`sale_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sale_items_product_id` ON `sale_items` (`product_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sale_items_sold_unit_id` ON `sale_items` (`sold_unit_id`)")
+
+                // 3. Create payments table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `payments` (
+                        `payment_id` TEXT NOT NULL PRIMARY KEY,
+                        `sale_id` TEXT NOT NULL,
+                        `shop_id` TEXT NOT NULL,
+                        `method` TEXT NOT NULL,
+                        `amount` INTEGER NOT NULL,
+                        `reference_number` TEXT,
+                        `received_at` INTEGER NOT NULL,
+                        `received_by` TEXT NOT NULL,
+                        FOREIGN KEY(`sale_id`) REFERENCES `sales`(`sale_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`shop_id`) REFERENCES `shops`(`shop_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`received_by`) REFERENCES `users`(`user_id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_payments_sale_id` ON `payments` (`sale_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_payments_shop_id` ON `payments` (`shop_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_payments_received_at` ON `payments` (`received_at`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_payments_received_by` ON `payments` (`received_by`)")
+
+                // 4. Create customer_ledger_entries table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `customer_ledger_entries` (
+                        `entry_id` TEXT NOT NULL PRIMARY KEY,
+                        `customer_id` TEXT NOT NULL,
+                        `shop_id` TEXT NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `amount` INTEGER NOT NULL,
+                        `reference_type` TEXT,
+                        `reference_id` TEXT,
+                        `notes` TEXT NOT NULL,
+                        `created_by` TEXT NOT NULL,
+                        `created_at` INTEGER NOT NULL,
+                        FOREIGN KEY(`customer_id`) REFERENCES `customers`(`customer_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`shop_id`) REFERENCES `shops`(`shop_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`created_by`) REFERENCES `users`(`user_id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_customer_ledger_entries_customer_id` ON `customer_ledger_entries` (`customer_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_customer_ledger_entries_shop_id` ON `customer_ledger_entries` (`shop_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_customer_ledger_entries_created_at` ON `customer_ledger_entries` (`created_at`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_customer_ledger_entries_reference_id` ON `customer_ledger_entries` (`reference_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_customer_ledger_entries_created_by` ON `customer_ledger_entries` (`created_by`)")
+
+                // 5. Create cash_movements table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `cash_movements` (
+                        `movement_id` TEXT NOT NULL PRIMARY KEY,
+                        `shop_id` TEXT NOT NULL,
+                        `device_id` TEXT NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `amount` INTEGER NOT NULL,
+                        `reference_type` TEXT,
+                        `reference_id` TEXT,
+                        `notes` TEXT NOT NULL,
+                        `created_by` TEXT NOT NULL,
+                        `created_at` INTEGER NOT NULL,
+                        FOREIGN KEY(`shop_id`) REFERENCES `shops`(`shop_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`device_id`) REFERENCES `devices`(`device_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`created_by`) REFERENCES `users`(`user_id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_cash_movements_shop_id` ON `cash_movements` (`shop_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_cash_movements_device_id` ON `cash_movements` (`device_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_cash_movements_created_at` ON `cash_movements` (`created_at`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_cash_movements_reference_id` ON `cash_movements` (`reference_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_cash_movements_created_by` ON `cash_movements` (`created_by`)")
+
+                // 6. Create audit_logs table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `audit_logs` (
+                        `log_id` TEXT NOT NULL PRIMARY KEY,
+                        `shop_id` TEXT NOT NULL,
+                        `user_id` TEXT NOT NULL,
+                        `action` TEXT NOT NULL,
+                        `entity_type` TEXT NOT NULL,
+                        `entity_id` TEXT NOT NULL,
+                        `details` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        FOREIGN KEY(`shop_id`) REFERENCES `shops`(`shop_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`user_id`) REFERENCES `users`(`user_id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_shop_id` ON `audit_logs` (`shop_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_user_id` ON `audit_logs` (`user_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_entity_type_entity_id` ON `audit_logs` (`entity_type`, `entity_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_audit_logs_timestamp` ON `audit_logs` (`timestamp`)")
+
+                // 7. Create sync_events table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `sync_events` (
+                        `event_id` TEXT NOT NULL PRIMARY KEY,
+                        `shop_id` TEXT NOT NULL,
+                        `device_id` TEXT NOT NULL,
+                        `entity_type` TEXT NOT NULL,
+                        `entity_id` TEXT NOT NULL,
+                        `operation` TEXT NOT NULL,
+                        `sync_status` TEXT NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        FOREIGN KEY(`shop_id`) REFERENCES `shops`(`shop_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`device_id`) REFERENCES `devices`(`device_id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sync_events_shop_id` ON `sync_events` (`shop_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sync_events_device_id` ON `sync_events` (`device_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sync_events_sync_status` ON `sync_events` (`sync_status`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sync_events_entity_type_entity_id` ON `sync_events` (`entity_type`, `entity_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sync_events_timestamp` ON `sync_events` (`timestamp`)")
+
+                // 8. Create invoice_sequences table
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `invoice_sequences` (
+                        `shop_id` TEXT NOT NULL PRIMARY KEY,
+                        `next_number` INTEGER NOT NULL,
+                        `prefix` TEXT NOT NULL,
+                        `updated_at` INTEGER NOT NULL,
+                        FOREIGN KEY(`shop_id`) REFERENCES `shops`(`shop_id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_invoice_sequences_shop_id` ON `invoice_sequences` (`shop_id`)")
+            }
+        }
+
         fun buildDatabase(context: Context, scope: CoroutineScope): GroceryPosDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
                 GroceryPosDatabase::class.java,
                 DATABASE_NAME
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .addCallback(DatabaseCallback(scope))
                 .build()
         }
