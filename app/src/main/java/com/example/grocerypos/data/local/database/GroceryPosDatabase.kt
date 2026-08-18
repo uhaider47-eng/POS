@@ -22,6 +22,7 @@ import com.example.grocerypos.data.local.dao.ProductDao
 import com.example.grocerypos.data.local.dao.RoleDao
 import com.example.grocerypos.data.local.dao.SaleDao
 import com.example.grocerypos.data.local.dao.SaleItemDao
+import com.example.grocerypos.data.local.dao.SaleOperationDao
 import com.example.grocerypos.data.local.dao.ShopDao
 import com.example.grocerypos.data.local.dao.StockBalanceDao
 import com.example.grocerypos.data.local.dao.StockMovementDao
@@ -43,6 +44,7 @@ import com.example.grocerypos.data.local.entity.ProductEntity
 import com.example.grocerypos.data.local.entity.RoleEntity
 import com.example.grocerypos.data.local.entity.SaleEntity
 import com.example.grocerypos.data.local.entity.SaleItemEntity
+import com.example.grocerypos.data.local.entity.SaleOperationEntity
 import com.example.grocerypos.data.local.entity.ShopEntity
 import com.example.grocerypos.data.local.entity.StockBalanceEntity
 import com.example.grocerypos.data.local.entity.StockMovementEntity
@@ -78,9 +80,10 @@ import kotlinx.coroutines.launch
         CashMovementEntity::class,
         AuditLogEntity::class,
         SyncEventEntity::class,
-        InvoiceSequenceEntity::class
+        InvoiceSequenceEntity::class,
+        SaleOperationEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -107,10 +110,11 @@ abstract class GroceryPosDatabase : RoomDatabase() {
     abstract fun auditLogDao(): AuditLogDao
     abstract fun syncEventDao(): SyncEventDao
     abstract fun invoiceSequenceDao(): InvoiceSequenceDao
+    abstract fun saleOperationDao(): SaleOperationDao
 
     companion object {
         const val DATABASE_NAME = "grocery_pos_db"
-        const val DATABASE_VERSION = 4
+        const val DATABASE_VERSION = 5
 
         /**
          * MIGRATION_1_2:
@@ -522,13 +526,37 @@ abstract class GroceryPosDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * MIGRATION_4_5:
+         * Adds the `sale_operations` table for durable transaction idempotency.
+         * Enforces unique constraint on `operation_id`.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `sale_operations` (
+                        `operation_id` TEXT NOT NULL PRIMARY KEY,
+                        `sale_id` TEXT NOT NULL,
+                        `shop_id` TEXT NOT NULL,
+                        `status` TEXT NOT NULL,
+                        `created_at` INTEGER NOT NULL,
+                        FOREIGN KEY(`sale_id`) REFERENCES `sales`(`sale_id`) ON UPDATE NO ACTION ON DELETE RESTRICT,
+                        FOREIGN KEY(`shop_id`) REFERENCES `shops`(`shop_id`) ON UPDATE NO ACTION ON DELETE RESTRICT
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_sale_operations_operation_id` ON `sale_operations` (`operation_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sale_operations_sale_id` ON `sale_operations` (`sale_id`)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_sale_operations_shop_id` ON `sale_operations` (`shop_id`)")
+            }
+        }
+
         fun buildDatabase(context: Context, scope: CoroutineScope): GroceryPosDatabase {
             return Room.databaseBuilder(
                 context.applicationContext,
                 GroceryPosDatabase::class.java,
                 DATABASE_NAME
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .addCallback(DatabaseCallback(scope))
                 .build()
         }

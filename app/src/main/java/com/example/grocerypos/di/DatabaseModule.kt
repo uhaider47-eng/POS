@@ -15,6 +15,7 @@ import com.example.grocerypos.data.local.dao.ProductDao
 import com.example.grocerypos.data.local.dao.RoleDao
 import com.example.grocerypos.data.local.dao.SaleDao
 import com.example.grocerypos.data.local.dao.SaleItemDao
+import com.example.grocerypos.data.local.dao.SaleOperationDao
 import com.example.grocerypos.data.local.dao.ShopDao
 import com.example.grocerypos.data.local.dao.StockBalanceDao
 import com.example.grocerypos.data.local.dao.StockMovementDao
@@ -25,6 +26,7 @@ import com.example.grocerypos.data.local.dao.UserDao
 import com.example.grocerypos.data.local.database.GroceryPosDatabase
 import com.example.grocerypos.data.local.database.RoomTransactionRunner
 import com.example.grocerypos.domain.transaction.TransactionRunner
+import com.example.grocerypos.domain.usecase.SaleFailureHook
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -120,4 +122,11 @@ object DatabaseModule {
 
     @Provides
     fun provideInvoiceSequenceDao(db: GroceryPosDatabase): InvoiceSequenceDao = db.invoiceSequenceDao()
+
+    @Provides
+    fun provideSaleOperationDao(db: GroceryPosDatabase): SaleOperationDao = db.saleOperationDao()
+
+    @Provides
+    @Singleton
+    fun provideSaleFailureHook(): SaleFailureHook = SaleFailureHook { }
 }

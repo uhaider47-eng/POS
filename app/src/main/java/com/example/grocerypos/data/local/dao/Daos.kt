@@ -22,6 +22,7 @@ import com.example.grocerypos.data.local.entity.ProductEntity
 import com.example.grocerypos.data.local.entity.RoleEntity
 import com.example.grocerypos.data.local.entity.SaleEntity
 import com.example.grocerypos.data.local.entity.SaleItemEntity
+import com.example.grocerypos.data.local.entity.SaleOperationEntity
 import com.example.grocerypos.data.local.entity.ShopEntity
 import com.example.grocerypos.data.local.entity.StockBalanceEntity
 import com.example.grocerypos.data.local.entity.StockMovementEntity
@@ -29,6 +30,7 @@ import com.example.grocerypos.data.local.entity.SupplierEntity
 import com.example.grocerypos.data.local.entity.SyncEventEntity
 import com.example.grocerypos.data.local.entity.UnitEntity
 import com.example.grocerypos.data.local.entity.UserEntity
+import com.example.grocerypos.domain.model.Quantity
 import com.example.grocerypos.domain.model.SaleStatus
 import com.example.grocerypos.domain.model.SyncStatus
 import kotlinx.coroutines.flow.Flow
@@ -216,11 +218,28 @@ interface StockBalanceDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertStockBalance(balance: StockBalanceEntity)
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertInitialStockBalanceIfNotExists(balance: StockBalanceEntity)
+
     @Query("SELECT * FROM stock_balances WHERE product_id = :productId")
     fun getStockBalanceFlow(productId: String): Flow<StockBalanceEntity?>
 
     @Query("SELECT * FROM stock_balances WHERE product_id = :productId")
     suspend fun getStockBalance(productId: String): StockBalanceEntity?
+
+    @Query("""
+        UPDATE stock_balances
+        SET quantity = quantity - :deductQuantity, updated_at = :updatedAt
+        WHERE product_id = :productId AND (
+            :allowNegativeStock = 1 OR quantity >= :deductQuantity
+        )
+    """)
+    suspend fun decrementStock(
+        productId: String,
+        deductQuantity: Quantity,
+        allowNegativeStock: Boolean,
+        updatedAt: Long
+    ): Int
 }
 
 @Dao
@@ -454,3 +473,16 @@ abstract class InvoiceSequenceDao {
         return "$prefix$formattedNumber"
     }
 }
+
+@Dao
+interface SaleOperationDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertOperation(operation: SaleOperationEntity)
+
+    @Query("SELECT * FROM sale_operations WHERE operation_id = :operationId")
+    suspend fun getOperation(operationId: String): SaleOperationEntity?
+
+    @Query("SELECT * FROM sale_operations WHERE sale_id = :saleId")
+    suspend fun getOperationsForSale(saleId: String): List<SaleOperationEntity>
+}
+

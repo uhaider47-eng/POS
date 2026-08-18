@@ -33,4 +33,8 @@ class InsufficientStockException(
 
 class ProductUnavailableException(message: String) : SaleDomainException(message)
 
+class CustomerNotFoundException(message: String) : SaleDomainException(message)
+
+class InactiveCustomerException(message: String) : SaleDomainException(message)
+
 class InvalidSaleStateException(message: String) : SaleDomainException(message)

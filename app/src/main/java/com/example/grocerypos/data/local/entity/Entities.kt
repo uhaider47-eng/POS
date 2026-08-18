@@ -1068,3 +1068,44 @@ data class InvoiceSequenceEntity(
     @ColumnInfo(name = "updated_at")
     val updatedAt: Long
 )
+
+@Entity(
+    tableName = "sale_operations",
+    foreignKeys = [
+        ForeignKey(
+            entity = SaleEntity::class,
+            parentColumns = ["sale_id"],
+            childColumns = ["sale_id"],
+            onDelete = ForeignKey.RESTRICT
+        ),
+        ForeignKey(
+            entity = ShopEntity::class,
+            parentColumns = ["shop_id"],
+            childColumns = ["shop_id"],
+            onDelete = ForeignKey.RESTRICT
+        )
+    ],
+    indices = [
+        Index(value = ["operation_id"], unique = true),
+        Index(value = ["sale_id"]),
+        Index(value = ["shop_id"])
+    ]
+)
+data class SaleOperationEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "operation_id")
+    val operationId: String,
+
+    @ColumnInfo(name = "sale_id")
+    val saleId: String,
+
+    @ColumnInfo(name = "shop_id")
+    val shopId: String,
+
+    @ColumnInfo(name = "status")
+    val status: String = "COMPLETED",
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: Long
+)
+
