@@ -505,3 +505,35 @@ class InvoiceSequenceRepositoryImpl @Inject constructor(
     }
 }
 
+@Singleton
+class SaleRepositoryImpl @Inject constructor(
+    private val saleDao: SaleDao,
+    private val saleItemDao: SaleItemDao,
+    private val paymentDao: PaymentDao
+) : SaleRepository {
+
+    override suspend fun getSaleById(saleId: String): Sale? {
+        return saleDao.getSaleWithDetails(saleId)?.toDomain()
+    }
+
+    override fun getSalesFlow(shopId: String): Flow<List<Sale>> {
+        return saleDao.getSalesForShopFlow(shopId).map { sales ->
+            sales.map { it.toDomain() }
+        }
+    }
+
+    override fun getSalesByStatusFlow(shopId: String, status: SaleStatus): Flow<List<Sale>> {
+        return saleDao.getSalesByStatusFlow(shopId, status).map { sales ->
+            sales.map { it.toDomain() }
+        }
+    }
+
+    override suspend fun findSaleByInvoiceNumber(shopId: String, invoiceNumber: String): Sale? {
+        val entity = saleDao.findSaleByInvoiceNumber(shopId, invoiceNumber) ?: return null
+        val items = saleItemDao.getItemsForSale(entity.saleId).map { it.toDomain() }
+        val payments = paymentDao.getPaymentsForSale(entity.saleId).map { it.toDomain() }
+        return entity.toDomain(items = items, payments = payments)
+    }
+}
+
+

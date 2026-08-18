@@ -27,9 +27,13 @@ import com.example.grocerypos.domain.model.CashMovementType
 import com.example.grocerypos.domain.model.CompleteSaleCommand
 import com.example.grocerypos.domain.model.CompleteSaleResult
 import com.example.grocerypos.domain.model.CustomerLedgerType
+import com.example.grocerypos.domain.model.EmptySaleException
+import com.example.grocerypos.domain.model.InsufficientStockException
+import com.example.grocerypos.domain.model.InvalidSaleStateException
 import com.example.grocerypos.domain.model.Money
 import com.example.grocerypos.domain.model.MovementType
 import com.example.grocerypos.domain.model.Product
+import com.example.grocerypos.domain.model.ProductUnavailableException
 import com.example.grocerypos.domain.model.Quantity
 import com.example.grocerypos.domain.model.Sale
 import com.example.grocerypos.domain.model.SaleStatus
@@ -91,12 +95,12 @@ class CompleteSaleUseCase @Inject constructor(
             }
 
             if (existingSale != null && existingSale.sale.status == SaleStatus.VOIDED) {
-                throw IllegalStateException("Cannot complete a VOIDED sale ($targetSaleId).")
+                throw InvalidSaleStateException("Cannot complete a VOIDED sale ($targetSaleId).")
             }
 
             // 2. Validate Items & Fetch Products
             if (command.items.isEmpty()) {
-                throw IllegalArgumentException("Sale must contain at least one item.")
+                throw EmptySaleException("Sale must contain at least one item.")
             }
 
             val productsMap = mutableMapOf<String, Product>()
@@ -104,7 +108,7 @@ class CompleteSaleUseCase @Inject constructor(
 
             for (item in command.items) {
                 val productEntity = productDao.getProductById(item.productId)
-                    ?: throw IllegalArgumentException("Product '${item.productId}' not found.")
+                    ?: throw ProductUnavailableException("Product '${item.productId}' not found.")
                 val product = productEntity.toDomain()
                 productsMap[item.productId] = product
 
@@ -134,11 +138,21 @@ class CompleteSaleUseCase @Inject constructor(
 
             val now = System.currentTimeMillis()
 
-            // 5. Stock Deductions and Movements
+            // 5. Stock Validations, Deductions and Movements
             for (item in totals.items) {
                 val currentStock = stockBalanceDao.getStockBalance(item.productId)
                 val currentQuantity = currentStock?.quantity ?: Quantity.ZERO
                 val avgCost = currentStock?.averageCost ?: Money.ZERO
+
+                // Stock validation inside transaction
+                if (!command.allowNegativeStock && currentQuantity < item.deductBaseQuantity) {
+                    throw InsufficientStockException(
+                        productId = item.productId,
+                        productName = item.productName,
+                        requiredQuantity = item.deductBaseQuantity,
+                        availableQuantity = currentQuantity
+                    )
+                }
 
                 val newStockQuantity = currentQuantity - item.deductBaseQuantity
                 stockBalanceDao.upsertStockBalance(

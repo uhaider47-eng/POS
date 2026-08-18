@@ -1,12 +1,19 @@
 package com.example.grocerypos.domain.service
 
+import com.example.grocerypos.domain.model.CustomerRequiredForCreditException
 import com.example.grocerypos.domain.model.Discount
 import com.example.grocerypos.domain.model.DiscountType
+import com.example.grocerypos.domain.model.EmptySaleException
+import com.example.grocerypos.domain.model.InvalidOverpaymentException
+import com.example.grocerypos.domain.model.InvalidPaymentAmountException
+import com.example.grocerypos.domain.model.InvalidPriceException
+import com.example.grocerypos.domain.model.InvalidQuantityException
 import com.example.grocerypos.domain.model.Money
 import com.example.grocerypos.domain.model.PaymentCommand
 import com.example.grocerypos.domain.model.PaymentMethod
 import com.example.grocerypos.domain.model.PaymentStatus
 import com.example.grocerypos.domain.model.Product
+import com.example.grocerypos.domain.model.ProductUnavailableException
 import com.example.grocerypos.domain.model.Quantity
 import com.example.grocerypos.domain.model.SaleItemCommand
 import com.example.grocerypos.domain.model.TaxRule
@@ -75,7 +82,9 @@ class SaleCalculator @Inject constructor(
         payments: List<PaymentCommand> = emptyList(),
         customerId: String? = null
     ): CalculatedSaleTotals {
-        require(items.isNotEmpty()) { "Sale must contain at least one item." }
+        if (items.isEmpty()) {
+            throw EmptySaleException()
+        }
 
         var runningSubtotal = Money.ZERO
         var runningItemDiscount = Money.ZERO
@@ -83,13 +92,19 @@ class SaleCalculator @Inject constructor(
 
         val calculatedItems = items.map { itemCmd ->
             val product = productsMap[itemCmd.productId]
-                ?: throw IllegalArgumentException("Product '${itemCmd.productId}' not found.")
+                ?: throw ProductUnavailableException("Product '${itemCmd.productId}' not found.")
 
-            require(product.isActive) { "Product '${product.name}' is inactive." }
-            require(itemCmd.quantity.isPositive()) { "Item quantity must be positive, got ${itemCmd.quantity}" }
+            if (!product.isActive) {
+                throw ProductUnavailableException("Product '${product.name}' is inactive.")
+            }
+            if (!itemCmd.quantity.isPositive()) {
+                throw InvalidQuantityException("Item quantity must be positive, got ${itemCmd.quantity}")
+            }
 
             val unitPrice = itemCmd.unitPriceOverride ?: product.sellingPrice
-            require(!unitPrice.isNegative()) { "Unit price cannot be negative, got $unitPrice" }
+            if (unitPrice.isNegative()) {
+                throw InvalidPriceException("Unit price cannot be negative, got $unitPrice")
+            }
 
             val soldUnitId = itemCmd.soldUnitId ?: product.sellingUnitId
 
@@ -163,7 +178,9 @@ class SaleCalculator @Inject constructor(
         var totalNonCash = Money.ZERO
 
         for (pmt in payments) {
-            require(!pmt.amount.isNegative()) { "Payment amount cannot be negative, got ${pmt.amount}" }
+            if (pmt.amount.isNegative()) {
+                throw InvalidPaymentAmountException("Payment amount cannot be negative, got ${pmt.amount}")
+            }
             if (pmt.method == PaymentMethod.CASH) {
                 totalCash += pmt.amount
             } else {
@@ -175,7 +192,7 @@ class SaleCalculator @Inject constructor(
 
         // Non-cash overpayment rule: Non-cash payments cannot exceed grand total
         if (totalNonCash > grandTotal) {
-            throw IllegalArgumentException(
+            throw InvalidOverpaymentException(
                 "Non-cash payments (${totalNonCash.toFormattedRupees()}) exceed grand total (${grandTotal.toFormattedRupees()}). Overpayment is allowed only via CASH."
             )
         }
@@ -205,7 +222,7 @@ class SaleCalculator @Inject constructor(
 
             // Credit rule: credit sale requires customerId
             if (customerId.isNullOrBlank()) {
-                throw IllegalArgumentException(
+                throw CustomerRequiredForCreditException(
                     "Credit sale with remaining due balance (${dueAmount.toFormattedRupees()}) requires a registered customer. Anonymous customer debt is not allowed."
                 )
             }

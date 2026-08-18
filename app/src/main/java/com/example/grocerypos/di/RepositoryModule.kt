@@ -4,12 +4,14 @@ import com.example.grocerypos.data.repository.CategoryRepositoryImpl
 import com.example.grocerypos.data.repository.DeviceRepositoryImpl
 import com.example.grocerypos.data.repository.InvoiceSequenceRepositoryImpl
 import com.example.grocerypos.data.repository.ProductRepositoryImpl
+import com.example.grocerypos.data.repository.SaleRepositoryImpl
 import com.example.grocerypos.data.repository.ShopRepositoryImpl
 import com.example.grocerypos.data.repository.UnitRepositoryImpl
 import com.example.grocerypos.domain.repository.CategoryRepository
 import com.example.grocerypos.domain.repository.DeviceRepository
 import com.example.grocerypos.domain.repository.InvoiceSequenceRepository
 import com.example.grocerypos.domain.repository.ProductRepository
+import com.example.grocerypos.domain.repository.SaleRepository
 import com.example.grocerypos.domain.repository.ShopRepository
 import com.example.grocerypos.domain.repository.UnitRepository
 import dagger.Binds
@@ -45,4 +47,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindInvoiceSequenceRepository(impl: InvoiceSequenceRepositoryImpl): InvoiceSequenceRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSaleRepository(impl: SaleRepositoryImpl): SaleRepository
 }

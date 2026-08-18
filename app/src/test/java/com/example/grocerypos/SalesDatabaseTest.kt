@@ -741,6 +741,270 @@ class SalesDatabaseTest {
     }
 
     @Test
+    fun testCompleteSaleUseCaseExecutesAtomically() = runBlocking {
+        val stockBalanceDao = db.stockBalanceDao()
+        val stockMovementDao = db.stockMovementDao()
+        val transactionRunner = RoomTransactionRunner(db)
+        val financialCalcService = com.example.grocerypos.domain.service.FinancialCalculationService()
+        val saleCalculator = com.example.grocerypos.domain.service.SaleCalculator(financialCalcService)
+
+        // Seed stock balance of 100 units
+        stockBalanceDao.upsertStockBalance(
+            com.example.grocerypos.data.local.entity.StockBalanceEntity(
+                productId = testProductId,
+                quantity = Quantity.fromWholeUnits(100),
+                averageCost = Money.fromRupees(240),
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+
+        val completeSaleUseCase = com.example.grocerypos.domain.usecase.CompleteSaleUseCase(
+            transactionRunner = transactionRunner,
+            saleDao = saleDao,
+            saleItemDao = saleItemDao,
+            paymentDao = paymentDao,
+            productDao = productDao,
+            stockBalanceDao = stockBalanceDao,
+            stockMovementDao = stockMovementDao,
+            customerDao = customerDao,
+            customerLedgerDao = customerLedgerDao,
+            cashMovementDao = cashMovementDao,
+            auditLogDao = auditLogDao,
+            syncEventDao = syncEventDao,
+            invoiceSequenceDao = invoiceSequenceDao,
+            saleCalculator = saleCalculator
+        )
+
+        val opId = UUID.randomUUID().toString()
+        val command = com.example.grocerypos.domain.model.CompleteSaleCommand(
+            operationId = opId,
+            shopId = testShopId,
+            deviceId = testDeviceId,
+            cashierId = testUserId,
+            customerId = testCustomerId,
+            items = listOf(
+                com.example.grocerypos.domain.model.SaleItemCommand(
+                    productId = testProductId,
+                    quantity = Quantity.fromWholeUnits(5)
+                )
+            ),
+            payments = listOf(
+                com.example.grocerypos.domain.model.PaymentCommand(
+                    method = PaymentMethod.CASH,
+                    amount = Money.fromRupees(1500) // 5 * 280 = 1400, Change = 100
+                )
+            ),
+            allowNegativeStock = false
+        )
+
+        val result = completeSaleUseCase(command).getOrThrow()
+        assertEquals(Money.fromRupees(1400), result.sale.grandTotal)
+        assertEquals(Money.fromRupees(100), result.changeReturned)
+        assertEquals(false, result.isIdempotentReplay)
+        assertEquals("INV-000001", result.sale.invoiceNumber)
+
+        // Verify stock deducted to 95 units
+        val updatedStock = stockBalanceDao.getStockBalance(testProductId)
+        assertEquals(Quantity.fromWholeUnits(95), updatedStock?.quantity)
+
+        // Verify idempotency replay
+        val secondResult = completeSaleUseCase(command).getOrThrow()
+        assertEquals(true, secondResult.isIdempotentReplay)
+        assertEquals(result.sale.saleId, secondResult.sale.saleId)
+
+        // Verify stock was not deducted again
+        val stockAfterSecond = stockBalanceDao.getStockBalance(testProductId)
+        assertEquals(Quantity.fromWholeUnits(95), stockAfterSecond?.quantity)
+    }
+
+    @Test
+    fun testCompleteSaleNegativeStockRejection() = runBlocking {
+        val stockBalanceDao = db.stockBalanceDao()
+        val stockMovementDao = db.stockMovementDao()
+        val transactionRunner = RoomTransactionRunner(db)
+        val financialCalcService = com.example.grocerypos.domain.service.FinancialCalculationService()
+        val saleCalculator = com.example.grocerypos.domain.service.SaleCalculator(financialCalcService)
+
+        // Stock is only 2 units
+        stockBalanceDao.upsertStockBalance(
+            com.example.grocerypos.data.local.entity.StockBalanceEntity(
+                productId = testProductId,
+                quantity = Quantity.fromWholeUnits(2),
+                averageCost = Money.fromRupees(240),
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+
+        val completeSaleUseCase = com.example.grocerypos.domain.usecase.CompleteSaleUseCase(
+            transactionRunner = transactionRunner,
+            saleDao = saleDao,
+            saleItemDao = saleItemDao,
+            paymentDao = paymentDao,
+            productDao = productDao,
+            stockBalanceDao = stockBalanceDao,
+            stockMovementDao = stockMovementDao,
+            customerDao = customerDao,
+            customerLedgerDao = customerLedgerDao,
+            cashMovementDao = cashMovementDao,
+            auditLogDao = auditLogDao,
+            syncEventDao = syncEventDao,
+            invoiceSequenceDao = invoiceSequenceDao,
+            saleCalculator = saleCalculator
+        )
+
+        val command = com.example.grocerypos.domain.model.CompleteSaleCommand(
+            operationId = UUID.randomUUID().toString(),
+            shopId = testShopId,
+            deviceId = testDeviceId,
+            cashierId = testUserId,
+            customerId = testCustomerId,
+            items = listOf(
+                com.example.grocerypos.domain.model.SaleItemCommand(
+                    productId = testProductId,
+                    quantity = Quantity.fromWholeUnits(5) // Needs 5, only 2 available
+                )
+            ),
+            payments = listOf(
+                com.example.grocerypos.domain.model.PaymentCommand(
+                    method = PaymentMethod.CASH,
+                    amount = Money.fromRupees(1400)
+                )
+            ),
+            allowNegativeStock = false
+        )
+
+        val result = completeSaleUseCase(command)
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() is com.example.grocerypos.domain.model.InsufficientStockException)
+
+        // Verify stock was unaffected
+        val stock = stockBalanceDao.getStockBalance(testProductId)
+        assertEquals(Quantity.fromWholeUnits(2), stock?.quantity)
+    }
+
+    @Test
+    fun testHoldSaleAndVoidSaleUseCase() = runBlocking {
+        val stockBalanceDao = db.stockBalanceDao()
+        val stockMovementDao = db.stockMovementDao()
+        val transactionRunner = RoomTransactionRunner(db)
+        val financialCalcService = com.example.grocerypos.domain.service.FinancialCalculationService()
+        val saleCalculator = com.example.grocerypos.domain.service.SaleCalculator(financialCalcService)
+
+        // Stock is 50 units
+        stockBalanceDao.upsertStockBalance(
+            com.example.grocerypos.data.local.entity.StockBalanceEntity(
+                productId = testProductId,
+                quantity = Quantity.fromWholeUnits(50),
+                averageCost = Money.fromRupees(240),
+                updatedAt = System.currentTimeMillis()
+            )
+        )
+
+        val holdSaleUseCase = com.example.grocerypos.domain.usecase.HoldSaleUseCase(
+            transactionRunner = transactionRunner,
+            saleDao = saleDao,
+            saleItemDao = saleItemDao,
+            productDao = productDao,
+            stockBalanceDao = stockBalanceDao,
+            auditLogDao = auditLogDao,
+            syncEventDao = syncEventDao,
+            saleCalculator = saleCalculator
+        )
+
+        val completeSaleUseCase = com.example.grocerypos.domain.usecase.CompleteSaleUseCase(
+            transactionRunner = transactionRunner,
+            saleDao = saleDao,
+            saleItemDao = saleItemDao,
+            paymentDao = paymentDao,
+            productDao = productDao,
+            stockBalanceDao = stockBalanceDao,
+            stockMovementDao = stockMovementDao,
+            customerDao = customerDao,
+            customerLedgerDao = customerLedgerDao,
+            cashMovementDao = cashMovementDao,
+            auditLogDao = auditLogDao,
+            syncEventDao = syncEventDao,
+            invoiceSequenceDao = invoiceSequenceDao,
+            saleCalculator = saleCalculator
+        )
+
+        val voidSaleUseCase = com.example.grocerypos.domain.usecase.VoidSaleUseCase(
+            transactionRunner = transactionRunner,
+            saleDao = saleDao,
+            stockBalanceDao = stockBalanceDao,
+            stockMovementDao = stockMovementDao,
+            customerLedgerDao = customerLedgerDao,
+            cashMovementDao = cashMovementDao,
+            auditLogDao = auditLogDao,
+            syncEventDao = syncEventDao
+        )
+
+        val saleId = UUID.randomUUID().toString()
+
+        // 1. Hold sale
+        val holdCommand = com.example.grocerypos.domain.model.HoldSaleCommand(
+            saleId = saleId,
+            shopId = testShopId,
+            deviceId = testDeviceId,
+            cashierId = testUserId,
+            customerId = testCustomerId,
+            items = listOf(
+                com.example.grocerypos.domain.model.SaleItemCommand(
+                    productId = testProductId,
+                    quantity = Quantity.fromWholeUnits(4)
+                )
+            )
+        )
+
+        val heldSale = holdSaleUseCase(holdCommand).getOrThrow()
+        assertEquals(SaleStatus.HELD, heldSale.status)
+        assertNull(heldSale.invoiceNumber)
+        // Stock should still be 50
+        assertEquals(Quantity.fromWholeUnits(50), stockBalanceDao.getStockBalance(testProductId)?.quantity)
+
+        // 2. Complete the held sale
+        val completeCommand = com.example.grocerypos.domain.model.CompleteSaleCommand(
+            operationId = UUID.randomUUID().toString(),
+            draftSaleId = saleId,
+            shopId = testShopId,
+            deviceId = testDeviceId,
+            cashierId = testUserId,
+            customerId = testCustomerId,
+            items = listOf(
+                com.example.grocerypos.domain.model.SaleItemCommand(
+                    productId = testProductId,
+                    quantity = Quantity.fromWholeUnits(4)
+                )
+            ),
+            payments = listOf(
+                com.example.grocerypos.domain.model.PaymentCommand(
+                    method = PaymentMethod.CASH,
+                    amount = Money.fromRupees(1120) // 4 * 280
+                )
+            )
+        )
+
+        val completedResult = completeSaleUseCase(completeCommand).getOrThrow()
+        assertEquals(SaleStatus.COMPLETED, completedResult.sale.status)
+        assertNotNull(completedResult.sale.invoiceNumber)
+        // Stock reduced to 46
+        assertEquals(Quantity.fromWholeUnits(46), stockBalanceDao.getStockBalance(testProductId)?.quantity)
+
+        // 3. Void the completed sale
+        val voidResult = voidSaleUseCase(
+            com.example.grocerypos.domain.usecase.VoidSaleCommand(
+                saleId = saleId,
+                cashierId = testUserId,
+                reason = "Customer cancelled before leaving counter"
+            )
+        ).getOrThrow()
+
+        assertEquals(SaleStatus.VOIDED, voidResult.status)
+        // Stock restored back to 50
+        assertEquals(Quantity.fromWholeUnits(50), stockBalanceDao.getStockBalance(testProductId)?.quantity)
+    }
+
+    @Test
     fun testConcurrentInvoiceAllocationProducesUniqueNumbers() = runBlocking {
         val concurrentShopId = UUID.randomUUID().toString()
         val allocationCount = 25
@@ -764,3 +1028,4 @@ class SalesDatabaseTest {
         assertEquals((allocationCount + 1).toLong(), seq?.nextNumber)
     }
 }
+

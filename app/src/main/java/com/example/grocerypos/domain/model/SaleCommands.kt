@@ -41,6 +41,7 @@ data class CompleteSaleCommand(
     val taxRule: TaxRule = TaxRule.NONE,
     val payments: List<PaymentCommand> = emptyList(),
     val notes: String = "",
+    val allowNegativeStock: Boolean = false,
     val invoicePrefix: String = "INV-"
 )
 
