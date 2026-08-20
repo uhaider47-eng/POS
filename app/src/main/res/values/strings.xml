@@ -92,4 +92,32 @@
     <string name="error_invalid_price">Price must be greater than 0</string>
     <string name="error_barcode_duplicate">This barcode is already assigned to another product in your shop</string>
     <string name="success_product_saved">Product saved successfully</string>
+
+    <!-- POS Terminal & Sales -->
+    <string name="nav_pos">New Sale</string>
+    <string name="pos_title">POS Terminal</string>
+    <string name="pos_search_barcode_hint">Search product name, SKU or scan barcode…</string>
+    <string name="pos_current_sale">Current Sale</string>
+    <string name="pos_cart_items_count">%d items in cart</string>
+    <string name="pos_empty_cart_title">Start a New Sale</string>
+    <string name="pos_empty_cart_desc">Scan a barcode or search for a product to add items to the cart.</string>
+    <string name="pos_no_search_results">No products found for this search.</string>
+    <string name="pos_total">Total</string>
+    <string name="pos_subtotal">Subtotal</string>
+    <string name="pos_btn_hold">HOLD</string>
+    <string name="pos_btn_customer">CUSTOMER</string>
+    <string name="pos_btn_payment">PAYMENT</string>
+    <string name="pos_btn_clear_cart">Clear Cart</string>
+    <string name="pos_hold_dialog_title">Hold Current Sale</string>
+    <string name="pos_hold_dialog_desc">Park this cart to serve another customer? You will be able to resume it later.</string>
+    <string name="pos_hold_dialog_confirm">Hold Sale</string>
+    <string name="pos_customer_placeholder_title">Customer Selection</string>
+    <string name="pos_customer_placeholder_desc">Walk-in Customer selected by default. Customer credit &amp; khata accounts module is scheduled for the upcoming Customer build.</string>
+    <string name="pos_payment_placeholder_title">Payment Module</string>
+    <string name="pos_payment_placeholder_desc">Cash, Card, JazzCash, and Easypaisa multi-tender checkout will be active in the next payment build.</string>
+    <string name="pos_btn_dismiss">Close</string>
+    <string name="pos_barcode_not_found">Barcode \'%s\' not found in catalog</string>
+    <string name="pos_product_added">Added %s to cart</string>
+    <string name="pos_cart_cleared">Cart cleared</string>
+    <string name="pos_sale_held_success">Sale placed on hold</string>
 </resources>

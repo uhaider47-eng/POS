@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.example.grocerypos.presentation.dashboard.DashboardScreen
+import com.example.grocerypos.presentation.pos.PosScreen
 import com.example.grocerypos.presentation.products.AddEditProductScreen
 import com.example.grocerypos.presentation.products.ProductListScreen
 import com.example.grocerypos.presentation.settings.SettingsScreen
@@ -33,12 +34,21 @@ fun GroceryPosNavGraph(
 
         composable(Screen.Dashboard.route) {
             DashboardScreen(
+                onNavigateToPos = {
+                    navController.navigate(Screen.Pos.route)
+                },
                 onNavigateToProducts = {
                     navController.navigate(Screen.Products.route)
                 },
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
                 }
+            )
+        }
+
+        composable(Screen.Pos.route) {
+            PosScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 

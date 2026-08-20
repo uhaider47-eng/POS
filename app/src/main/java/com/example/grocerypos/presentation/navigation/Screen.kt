@@ -3,6 +3,7 @@ package com.example.grocerypos.presentation.navigation
 sealed class Screen(val route: String) {
     object Setup : Screen("setup")
     object Dashboard : Screen("dashboard")
+    object Pos : Screen("pos")
     object Products : Screen("products")
     object AddProduct : Screen("products/add")
     object EditProduct : Screen("products/edit/{productId}") {

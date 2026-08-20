@@ -51,6 +51,7 @@ import com.example.grocerypos.R
 
 @Composable
 fun DashboardScreen(
+    onNavigateToPos: () -> Unit,
     onNavigateToProducts: () -> Unit,
     onNavigateToSettings: () -> Unit,
     viewModel: DashboardViewModel = hiltViewModel()
@@ -104,7 +105,34 @@ fun DashboardScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // PRIMARY OPERATIONAL ACTION: NEW SALE BUTTON (POS TERMINAL)
+        Button(
+            onClick = onNavigateToPos,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp, pressedElevation = 1.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.PointOfSale,
+                contentDescription = null,
+                modifier = Modifier.size(26.dp)
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = stringResource(R.string.nav_pos),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Black
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
 
         // Shop & Primary Hub Info Card
         Card(
