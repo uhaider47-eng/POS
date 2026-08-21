@@ -68,5 +68,6 @@ interface SaleRepository {
     suspend fun getSaleById(saleId: String): Sale?
     fun getSalesFlow(shopId: String): Flow<List<Sale>>
     fun getSalesByStatusFlow(shopId: String, status: SaleStatus = SaleStatus.COMPLETED): Flow<List<Sale>>
+    fun getSalesWithDetailsByStatusFlow(shopId: String, status: SaleStatus = SaleStatus.HELD): Flow<List<Sale>>
     suspend fun findSaleByInvoiceNumber(shopId: String, invoiceNumber: String): Sale?
 }

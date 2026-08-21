@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.PauseCircleOutline
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.icons.filled.PointOfSale
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -35,6 +36,8 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -135,6 +138,24 @@ fun PosScreen(
                     }
                 },
                 actions = {
+                    // Held Sales Action Button with Badge
+                    IconButton(onClick = { viewModel.onShowHeldSalesClicked() }) {
+                        BadgedBox(
+                            badge = {
+                                if (uiState.activeHeldSalesCount > 0) {
+                                    Badge {
+                                        Text("${uiState.activeHeldSalesCount}")
+                                    }
+                                }
+                            }
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PauseCircleOutline,
+                                contentDescription = "Held Sales"
+                            )
+                        }
+                    }
+
                     if (uiState.cartItems.isNotEmpty()) {
                         TextButton(onClick = { viewModel.clearCart() }) {
                             Text(
@@ -245,89 +266,66 @@ fun PosScreen(
         )
     }
 
-    // Customer Selection Dialog (Placeholder Contract)
-    if (uiState.showCustomerDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissCustomerDialog() },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.PersonOutline,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.secondary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.pos_customer_placeholder_title),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            },
-            text = {
-                Text(
-                    text = stringResource(R.string.pos_customer_placeholder_desc),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.dismissCustomerDialog() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text(stringResource(R.string.pos_btn_dismiss))
-                }
+    // Customer Selection Bottom Sheet
+    if (uiState.showCustomerSheet) {
+        CustomerSelectionSheet(
+            searchQuery = uiState.customerSearchQuery,
+            searchResults = uiState.customerSearchResults,
+            selectedCustomer = uiState.selectedCustomer,
+            onQueryChanged = viewModel::onCustomerSearchQueryChanged,
+            onSelectCustomer = viewModel::selectCustomer,
+            onClearCustomer = viewModel::clearCustomer,
+            onQuickAddClicked = viewModel::onQuickAddCustomerClicked,
+            onDismiss = viewModel::dismissCustomerSheet
+        )
+    }
+
+    // Quick Add Customer Dialog
+    if (uiState.showQuickAddCustomerDialog) {
+        QuickAddCustomerDialog(
+            onDismiss = viewModel::dismissQuickAddCustomerDialog,
+            onConfirm = { name, phone, address, limit ->
+                viewModel.createCustomer(name, phone, address, limit)
             }
         )
     }
 
-    // Payment Dialog (Placeholder Contract)
-    if (uiState.showPaymentDialog) {
-        AlertDialog(
-            onDismissRequest = { viewModel.dismissPaymentDialog() },
-            title = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.PointOfSale,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = stringResource(R.string.pos_payment_placeholder_title),
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+    // Held Sales Bottom Sheet
+    if (uiState.showHeldSalesSheet) {
+        HeldSalesSheet(
+            heldSales = uiState.heldSalesList,
+            onResumeSale = viewModel::resumeHeldSale,
+            onDiscardSale = viewModel::discardHeldSale,
+            onDismiss = viewModel::dismissHeldSalesSheet
+        )
+    }
+
+    // Payment Checkout Bottom Sheet
+    if (uiState.showPaymentSheet) {
+        PaymentSheet(
+            grandTotal = uiState.grandTotal,
+            selectedCustomer = uiState.selectedCustomer,
+            selectedCustomerBalance = uiState.selectedCustomerBalance,
+            isCompletingSale = uiState.isCompletingSale,
+            onCompleteSale = { payments, tendered ->
+                viewModel.completeSale(payments, tendered)
             },
-            text = {
-                Column {
-                    Text(
-                        text = "Total Payable: ${CurrencyFormatter.formatPkr(uiState.grandTotal)}",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Black,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.pos_payment_placeholder_desc),
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = { viewModel.dismissPaymentDialog() },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text(stringResource(R.string.pos_btn_dismiss))
-                }
-            }
+            onDismiss = viewModel::dismissPaymentSheet
+        )
+    }
+
+    // Sale Receipt / Success Dialog
+    uiState.saleSuccessResult?.let { successData ->
+        SaleSuccessDialog(
+            successData = successData,
+            onDismiss = viewModel::dismissSuccessResult
         )
     }
 }
 
 /**
  * Single-Pane Phone Layout.
- * Vertically arranged: Top Search/Scan Bar -> Cart Items / Empty State -> Sticky Bottom Total & Action Panel.
+ * Vertically arranged: Top Search/Scan Bar -> Customer Chip -> Cart Items / Empty State -> Sticky Bottom Total & Action Panel.
  */
 @Composable
 private fun PhonePosLayout(
@@ -351,6 +349,16 @@ private fun PhonePosLayout(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        // Customer Quick Bar
+        CustomerQuickBar(
+            customer = uiState.selectedCustomer,
+            balance = uiState.selectedCustomerBalance,
+            onClick = onCustomerClicked,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 2.dp)
         )
 
         // If search query is non-empty, display inline search results overlay
@@ -488,7 +496,7 @@ private fun TabletPosLayout(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -500,24 +508,17 @@ private fun TabletPosLayout(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "${uiState.totalItemCount} items • ${uiState.selectedCustomerName}",
+                            text = "${uiState.totalItemCount} items in cart",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
 
-                    Surface(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        Text(
-                            text = "Counter 1",
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                    CustomerQuickBar(
+                        customer = uiState.selectedCustomer,
+                        balance = uiState.selectedCustomerBalance,
+                        onClick = onCustomerClicked
+                    )
                 }
 
                 Divider(color = MaterialTheme.colorScheme.surfaceVariant)
@@ -568,6 +569,52 @@ private fun TabletPosLayout(
 }
 
 /**
+ * Customer Quick Selector Bar Chip.
+ */
+@Composable
+private fun CustomerQuickBar(
+    customer: com.example.grocerypos.domain.model.Customer?,
+    balance: com.example.grocerypos.domain.model.Money,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.clickable { onClick() },
+        shape = RoundedCornerShape(8.dp),
+        color = if (customer != null) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Person,
+                contentDescription = null,
+                tint = if (customer != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(6.dp))
+            Column {
+                Text(
+                    text = customer?.name ?: "Walk-in Customer",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (customer != null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                )
+                if (customer != null && balance.isPositive()) {
+                    Text(
+                        text = "Khata Due: ${CurrencyFormatter.formatPkr(balance)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
  * Reusable Search and Barcode Input Bar with Enter Action for Hardware/Keyboard Scanners.
  */
 @Composable
@@ -599,11 +646,10 @@ private fun SearchBarSection(
         trailingIcon = {
             Icon(
                 imageVector = Icons.Default.QrCodeScanner,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                contentDescription = "Barcode ready",
+                tint = MaterialTheme.colorScheme.secondary
             )
         },
-        shape = RoundedCornerShape(12.dp),
         singleLine = true,
         keyboardOptions = KeyboardOptions(
             keyboardType = KeyboardType.Text,
@@ -614,15 +660,16 @@ private fun SearchBarSection(
                 onBarcodeSubmit(query)
             }
         ),
+        shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = MaterialTheme.colorScheme.primary,
-            unfocusedBorderColor = MaterialTheme.colorScheme.outline
+            unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
         )
     )
 }
 
 /**
- * Displays Search Results or Product Catalog items.
+ * Displays Search & Catalog results in a clean, high-density scrollable list.
  */
 @Composable
 private fun SearchResultsList(
@@ -644,16 +691,16 @@ private fun SearchResultsList(
     } else {
         LazyColumn(
             modifier = modifier,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
             contentPadding = PaddingValues(vertical = 4.dp)
         ) {
             items(
                 items = searchResults,
                 key = { it.product.productId }
-            ) { item ->
-                ProductResultRow(
-                    item = item,
-                    onClick = { onProductSelected(item.product) }
+            ) { itemUi ->
+                ProductCatalogItemRow(
+                    itemUi = itemUi,
+                    onClick = { onProductSelected(itemUi.product) }
                 )
             }
         }
@@ -661,56 +708,52 @@ private fun SearchResultsList(
 }
 
 /**
- * Individual Product Row in Catalog / Search Results.
+ * Individual Product Row in the Search / Catalog List.
  */
 @Composable
-private fun ProductResultRow(
-    item: PosProductUi,
-    onClick: () -> Unit
+private fun ProductCatalogItemRow(
+    itemUi: PosProductUi,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val product = item.product
-    Card(
-        modifier = Modifier
+    Surface(
+        modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
             .clickable { onClick() },
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        tonalElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp),
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = product.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    text = itemUi.product.name,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(2.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Text(
-                        text = item.categoryName,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.secondary,
-                        fontWeight = FontWeight.Medium
+                        text = itemUi.categoryName,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    if (item.sellingUnitSymbol.isNotBlank()) {
+                    if (itemUi.primaryBarcode.isNotBlank()) {
                         Text(
-                            text = " • per ${item.sellingUnitSymbol}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (item.primaryBarcode.isNotBlank()) {
-                        Text(
-                            text = " • #${item.primaryBarcode}",
-                            style = MaterialTheme.typography.bodySmall,
+                            text = "• ${itemUi.primaryBarcode}",
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -721,21 +764,16 @@ private fun ProductResultRow(
 
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = CurrencyFormatter.formatPkr(product.sellingPrice),
+                    text = CurrencyFormatter.formatPkr(itemUi.product.sellingPrice),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.primary
                 )
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = RoundedCornerShape(6.dp)
-                ) {
+                if (itemUi.sellingUnitSymbol.isNotBlank()) {
                     Text(
-                        text = "+ ADD",
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                        text = "per ${itemUi.sellingUnitSymbol}",
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
@@ -744,59 +782,58 @@ private fun ProductResultRow(
 }
 
 /**
- * Cart Item Row with [-] Quantity [+] and Delete Controls.
+ * Individual Cart Item Row with Quantity Incrementor/Decrementor & Line Total.
  */
 @Composable
 private fun CartItemRow(
     item: CartItemUi,
     onIncrease: () -> Unit,
     onDecrease: () -> Unit,
-    onRemove: () -> Unit
+    onRemove: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
+    Surface(
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+        tonalElevation = 1.dp
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+                .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Product Info
+            // Product Name and Unit Price
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = item.product.name,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
-                    text = "${item.quantity.toFormattedString()} × ${CurrencyFormatter.formatPkr(item.unitPrice)}",
+                    text = "${CurrencyFormatter.formatPkr(item.unitPrice)} / ${item.unitSymbol.ifBlank { "unit" }}",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(8.dp))
 
-            // Quantity Stepper Controls
+            // Quantity Control Buttons (- QTY +)
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
                     onClick = onDecrease,
                     modifier = Modifier
                         .size(36.dp)
                         .background(
-                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            color = MaterialTheme.colorScheme.surface,
                             shape = CircleShape
                         )
                 ) {
@@ -1005,8 +1042,10 @@ private fun BottomActionPanel(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = stringResource(R.string.pos_btn_customer),
-                        fontWeight = FontWeight.Bold
+                        text = if (uiState.selectedCustomer != null) uiState.selectedCustomer.name.take(10) else stringResource(R.string.pos_btn_customer),
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

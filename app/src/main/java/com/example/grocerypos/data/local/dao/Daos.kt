@@ -323,6 +323,10 @@ interface SaleDao {
     @Query("SELECT * FROM sales WHERE shop_id = :shopId AND status = :status ORDER BY created_at DESC")
     fun getSalesByStatusFlow(shopId: String, status: SaleStatus = SaleStatus.COMPLETED): Flow<List<SaleEntity>>
 
+    @Transaction
+    @Query("SELECT * FROM sales WHERE shop_id = :shopId AND status = :status ORDER BY created_at DESC")
+    fun getSalesWithDetailsByStatusFlow(shopId: String, status: SaleStatus = SaleStatus.HELD): Flow<List<SaleWithItemsAndPayments>>
+
     @Query("SELECT * FROM sales WHERE shop_id = :shopId AND invoice_number = :invoiceNumber LIMIT 1")
     suspend fun findSaleByInvoiceNumber(shopId: String, invoiceNumber: String): SaleEntity?
 }

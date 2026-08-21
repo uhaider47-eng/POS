@@ -528,6 +528,12 @@ class SaleRepositoryImpl @Inject constructor(
         }
     }
 
+    override fun getSalesWithDetailsByStatusFlow(shopId: String, status: SaleStatus): Flow<List<Sale>> {
+        return saleDao.getSalesWithDetailsByStatusFlow(shopId, status).map { list ->
+            list.map { it.toDomain() }
+        }
+    }
+
     override suspend fun findSaleByInvoiceNumber(shopId: String, invoiceNumber: String): Sale? {
         val entity = saleDao.findSaleByInvoiceNumber(shopId, invoiceNumber) ?: return null
         val items = saleItemDao.getItemsForSale(entity.saleId).map { it.toDomain() }
